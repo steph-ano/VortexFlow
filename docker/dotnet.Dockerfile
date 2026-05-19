@@ -7,8 +7,10 @@ COPY ["src/backend-dotnet/VortexFlow.Api/VortexFlow.Api.csproj", "VortexFlow.Api
 COPY ["src/backend-dotnet/VortexFlow.Application/VortexFlow.Application.csproj", "VortexFlow.Application/"]
 COPY ["src/backend-dotnet/VortexFlow.Domain/VortexFlow.Domain.csproj", "VortexFlow.Domain/"]
 COPY ["src/backend-dotnet/VortexFlow.Infrastructure/VortexFlow.Infrastructure.csproj", "VortexFlow.Infrastructure/"]
-COPY ["src/backend-dotnet/VortexFlow.sln", "./"]
-RUN dotnet restore "VortexFlow.sln"
+RUN dotnet restore "VortexFlow.Api/VortexFlow.Api.csproj" && \
+    dotnet restore "VortexFlow.Application/VortexFlow.Application.csproj" && \
+    dotnet restore "VortexFlow.Domain/VortexFlow.Domain.csproj" && \
+    dotnet restore "VortexFlow.Infrastructure/VortexFlow.Infrastructure.csproj"
 
 # Copiar resto del código y hacer build
 COPY src/backend-dotnet/ .
