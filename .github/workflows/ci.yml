@@ -129,7 +129,7 @@ jobs:
         with:
           images: ghcr.io/${{ steps.vars.outputs.repo }}/vortexflow-api
           tags: |
-            type=sha
+            type=sha,format=long
             type=raw,value=latest
 
       - name: Build & Push API image
@@ -163,7 +163,7 @@ jobs:
         with:
           images: ghcr.io/${{ steps.vars.outputs.repo }}/vortexflow-worker
           tags: |
-            type=sha
+            type=sha,format=long
             type=raw,value=latest
 
       - name: Build & Push Worker image
@@ -197,7 +197,7 @@ jobs:
         with:
           images: ghcr.io/${{ steps.vars.outputs.repo }}/vortexflow-frontend
           tags: |
-            type=sha
+            type=sha,format=long
             type=raw,value=latest
 
       - name: Build & Push Frontend image
