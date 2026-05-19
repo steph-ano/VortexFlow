@@ -94,3 +94,59 @@ Para iniciar: `docker compose -f docker-compose.observability.yml up -d`
 - ✅ Fase 3: Background Jobs & Tiempo Real (Hangfire, SignalR, MassTransit)
 - ✅ Fase 4: Resiliencia (Circuit Breakers, Rate Limiting, Polly)
 - ✅ Fase 5: DevOps & Observabilidad (K8s, OTLP, Grafana, CI/CD completo)
+- ✅ Fase 6: Validación & Lanzamiento MVP
+
+---
+
+## 🚀 MVP Listo para Beta
+
+El proyecto VortexFlow ha alcanzado el estado de **MVP (Producto Mínimo Viable)** y está listo para pruebas beta.
+
+### Despliegue Rápido (Beta)
+
+Para probar la versión empaquetada del MVP:
+
+```bash
+# Opción 1: Usar imágenes de GHCR
+docker compose -f docker-compose.beta.yml up -d
+
+# Opción 2: Desarrollo local (requiere setup previo)
+docker compose up -d
+cd src/backend-dotnet && dotnet run
+cd src/backend-python && poetry run uvicorn main:app --reload
+cd src/frontend && npm run dev
+```
+
+### Credenciales por Defecto
+
+| Rol | Email | Contraseña |
+|-----|-------|------------|
+| Administrador | admin@vortexflow.local | Admin123! |
+
+### Servicios Disponibles
+
+| Servicio | URL | Puerto |
+|----------|-----|--------|
+| Frontend (Vue) | http://localhost:5173 | 5173 |
+| API (.NET) | http://localhost:5032 | 5032 |
+| Worker (Python) | http://localhost:8000 | 8000 |
+| PostgreSQL | localhost | 5432 |
+| Redis | localhost | 6379 |
+| RabbitMQ | localhost | 5672/15672 |
+| Grafana | http://localhost:3000 | 3000 |
+| Prometheus | http://localhost:9090 | 9090 |
+
+### Documentación
+
+- [Guía de Usuario](./docs/user-guide.md) - Cómo usar el sistema
+- [Pruebas E2E](./docs/e2e-tests.md) - Ejecutar pruebas automatizadas
+- [Checklist de Regresión](./docs/regression-checklist.md) - Verificación manual
+- [Despliegue](./docs/deployment.md) - Guía completa de despliegue
+- [CHANGELOG](./CHANGELOG.md) - Historial de versiones
+
+### Imágenes en GHCR
+
+El pipeline CI/CD construye y publica automáticamente imágenes a GHCR:
+- `ghcr.io/steph-ano/vortexflow/vortexflow-api:latest`
+- `ghcr.io/steph-ano/vortexflow/vortexflow-worker:latest`
+- `ghcr.io/steph-ano/vortexflow/vortexflow-frontend:latest`

@@ -1,0 +1,150 @@
+version: '3.8'
+
+services:
+  # Infrastructure
+  postgres:
+    image: timescale/timescaledb:latest-pg16
+    container_name: vortexflow-postgres-beta
+    environment:
+      POSTGRES_USER: vortexflow
+      POSTGRES_PASSWORD: VortexFlow2024!
+      POSTGRES_DB: vortexflow
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U vortexflow"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  redis:
+    image: redis:7-alpine
+    container_name: vortexflow-redis-beta
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  rabbitmq:
+    image: rabbitmq:3.13-management-alpine
+    container_name: vortexflow-rabbitmq-beta
+    environment:
+      RABBITMQ_DEFAULT_USER: vortexflow
+      RABBITMQ_DEFAULT_PASS: VortexFlow2024!
+    ports:
+      - "5672:5672"
+      - "15672:15672"
+    volumes:
+      - rabbitmq_data:/var/lib/rabbitmq
+    healthcheck:
+      test: ["CMD", "rabbitmq-diagnostics", "check_running"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # Application Services - Using GHCR Images
+  api:
+    image: ghcr.io/steph-ano/vortexflow/vortexflow-api:latest
+    container_name: vortexflow-api-beta
+    environment:
+      ASPNETCORE_ENVIRONMENT: Development
+      ASPNETCORE_URLS: http://+:8080
+      ConnectionStrings__DefaultConnection: "Host=postgres;Port=5432;Database=vortexflow;Username=vortexflow;Password=VortexFlow2024!"
+      Redis__ConnectionString: "redis:6379"
+      RabbitMQ__Host: "rabbitmq"
+      RabbitMQ__Username: "vortexflow"
+      RabbitMQ__Password: "VortexFlow2024!"
+      JWT__Key: "VortexFlowSuperSecretKey2024ForJWTAuthentication!"
+      JWT__Issuer: "VortexFlow"
+      JWT__Audience: "VortexFlowAPI"
+    ports:
+      - "5032:8080"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+    restart: unless-stopped
+
+  worker:
+    image: ghcr.io/steph-ano/vortexflow/vortexflow-worker:latest
+    container_name: vortexflow-worker-beta
+    environment:
+      REDIS_URL: "redis://redis:6379"
+      RABBITMQ_URL: "amqp://vortexflow:VortexFlow2024!@rabbitmq:5672"
+      DOTNET_INGEST_URL: "http://api:8080/api/ingest"
+      API_KEY_INTERNAL: "InternalAPIKey2024!VortexFlow"
+      OTLP_ENDPOINT: "http://otel-collector:4317"
+      HOSTNAME: "vortexflow-worker-beta"
+    depends_on:
+      - redis
+      - rabbitmq
+    restart: unless-stopped
+
+  frontend:
+    image: ghcr.io/steph-ano/vortexflow/vortexflow-frontend:latest
+    container_name: vortexflow-frontend-beta
+    environment:
+      VITE_API_URL: "http://localhost:5032"
+      VITE_WS_URL: "http://localhost:5032/hub"
+    ports:
+      - "5173:80"
+    depends_on:
+      - api
+    restart: unless-stopped
+
+  # Observability Stack (Optional)
+  otel-collector:
+    image: otel/opentelemetry-collector-contrib:latest
+    container_name: vortexflow-otel-beta
+    command: ["--config=/etc/otelcol-contrib/config.yaml"]
+    volumes:
+      - ./grafana/otel-collector-config.yaml:/etc/otelcol-contrib/config.yaml
+    ports:
+      - "4317:4317"
+      - "4318:4318"
+
+  prometheus:
+    image: prom/prometheus:latest
+    container_name: vortexflow-prometheus-beta
+    volumes:
+      - ./grafana/prometheus.yml:/etc/prometheus/prometheus.yml
+      - prometheus_data:/prometheus
+    ports:
+      - "9090:9090"
+    command:
+      - '--config.file=/etc/prometheus/prometheus.yml'
+      - '--storage.tsdb.path=/prometheus'
+
+  grafana:
+    image: grafana/grafana:10.4.3
+    container_name: vortexflow-grafana-beta
+    environment:
+      GF_SECURITY_ADMIN_USER: admin
+      GF_SECURITY_ADMIN_PASSWORD: admin
+    volumes:
+      - ./grafana/provisioning:/etc/grafana/provisioning
+      - ./grafana/dashboards:/var/lib/grafana/dashboards
+    ports:
+      - "3000:3000"
+    depends_on:
+      - prometheus
+
+volumes:
+  postgres_data:
+  redis_data:
+  rabbitmq_data:
+  prometheus_data:
+
+networks:
+  default:
+    name: vortexflow-network-beta
