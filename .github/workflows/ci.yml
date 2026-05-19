@@ -132,16 +132,14 @@ jobs:
             type=sha,format=long
             type=raw,value=latest
 
-      - name: Build & Push API image
-        uses: docker/build-push-action@v5
-        with:
-          context: .
-          file: docker/dotnet.Dockerfile
-          push: true
-          tags: ${{ steps.meta-api.outputs.tags }}
-          labels: ${{ steps.meta-api.outputs.labels }}
-          cache-from: type=gha
-          cache-to: type=gha,mode=max
+      - name: Build API image
+        run: |
+          IMAGE_NAME="ghcr.io/${{ steps.vars.outputs.repo }}/vortexflow-api:latest"
+          docker build -t $IMAGE_NAME -f docker/dotnet.Dockerfile .
+          docker tag $IMAGE_NAME "ghcr.io/${{ steps.vars.outputs.repo }}/vortexflow-api:${{ github.sha }}"
+
+      - name: Push API image
+        run: docker push ghcr.io/${{ steps.vars.outputs.repo }}/vortexflow-api:${{ github.sha }}
 
       - name: Pull API image for local scan
         run: docker pull ghcr.io/${{ steps.vars.outputs.repo }}/vortexflow-api:${{ github.sha }}
@@ -166,16 +164,14 @@ jobs:
             type=sha,format=long
             type=raw,value=latest
 
-      - name: Build & Push Worker image
-        uses: docker/build-push-action@v5
-        with:
-          context: .
-          file: docker/python.Dockerfile
-          push: true
-          tags: ${{ steps.meta-worker.outputs.tags }}
-          labels: ${{ steps.meta-worker.outputs.labels }}
-          cache-from: type=gha
-          cache-to: type=gha,mode=max
+      - name: Build Worker image
+        run: |
+          IMAGE_NAME="ghcr.io/${{ steps.vars.outputs.repo }}/vortexflow-worker:latest"
+          docker build -t $IMAGE_NAME -f docker/python.Dockerfile .
+          docker tag $IMAGE_NAME "ghcr.io/${{ steps.vars.outputs.repo }}/vortexflow-worker:${{ github.sha }}"
+
+      - name: Push Worker image
+        run: docker push ghcr.io/${{ steps.vars.outputs.repo }}/vortexflow-worker:${{ github.sha }}
 
       - name: Pull Worker image for local scan
         run: docker pull ghcr.io/${{ steps.vars.outputs.repo }}/vortexflow-worker:${{ github.sha }}
@@ -200,16 +196,14 @@ jobs:
             type=sha,format=long
             type=raw,value=latest
 
-      - name: Build & Push Frontend image
-        uses: docker/build-push-action@v5
-        with:
-          context: .
-          file: docker/frontend.Dockerfile
-          push: true
-          tags: ${{ steps.meta-frontend.outputs.tags }}
-          labels: ${{ steps.meta-frontend.outputs.labels }}
-          cache-from: type=gha
-          cache-to: type=gha,mode=max
+      - name: Build Frontend image
+        run: |
+          IMAGE_NAME="ghcr.io/${{ steps.vars.outputs.repo }}/vortexflow-frontend:latest"
+          docker build -t $IMAGE_NAME -f docker/frontend.Dockerfile .
+          docker tag $IMAGE_NAME "ghcr.io/${{ steps.vars.outputs.repo }}/vortexflow-frontend:${{ github.sha }}"
+
+      - name: Push Frontend image
+        run: docker push ghcr.io/${{ steps.vars.outputs.repo }}/vortexflow-frontend:${{ github.sha }}
 
       - name: Pull Frontend image for local scan
         run: docker pull ghcr.io/${{ steps.vars.outputs.repo }}/vortexflow-frontend:${{ github.sha }}
