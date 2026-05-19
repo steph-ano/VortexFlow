@@ -1,5 +1,8 @@
 name: VortexFlow CI/CD
 
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+
 on:
   push:
     branches:
@@ -133,7 +136,7 @@ jobs:
           cache-to: type=gha,mode=max
 
       - name: Trivy Scan API image
-        uses: aquasecurity/trivy-action@v0.28.0
+        uses: aquasecurity/trivy-action@v0.36.0
         with:
           image-ref: ghcr.io/${{ github.repository }}/vortexflow-api:${{ github.sha }}
           format: table
@@ -161,7 +164,7 @@ jobs:
           cache-to: type=gha,mode=max
 
       - name: Trivy Scan Worker image
-        uses: aquasecurity/trivy-action@v0.28.0
+        uses: aquasecurity/trivy-action@v0.36.0
         with:
           image-ref: ghcr.io/${{ github.repository }}/vortexflow-worker:${{ github.sha }}
           format: table
@@ -189,7 +192,7 @@ jobs:
           cache-to: type=gha,mode=max
 
       - name: Trivy Scan Frontend image
-        uses: aquasecurity/trivy-action@v0.28.0
+        uses: aquasecurity/trivy-action@v0.36.0
         with:
           image-ref: ghcr.io/${{ github.repository }}/vortexflow-frontend:${{ github.sha }}
           format: table
