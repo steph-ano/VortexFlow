@@ -2,7 +2,7 @@
 FROM python:3.11-slim AS builder
 WORKDIR /app
 
-RUN pip install --no-cache-dir poetry poetry-plugin-export
+RUN pip install --no-cache-dir "wheel>=0.46.2" poetry poetry-plugin-export
 
 COPY src/backend-python/pyproject.toml src/backend-python/poetry.lock* ./
 
@@ -12,6 +12,9 @@ RUN poetry config virtualenvs.create false \
 # Etapa 2: Runtime
 FROM python:3.11-slim AS final
 WORKDIR /app
+
+# Actualizar paquetes de seguridad del OS
+RUN apt-get update && apt-get upgrade -y && rm -rf /var/lib/apt/lists/*
 
 RUN groupadd -r appuser && useradd -r -g appuser appuser
 
