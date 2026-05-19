@@ -143,6 +143,9 @@ jobs:
           cache-from: type=gha
           cache-to: type=gha,mode=max
 
+      - name: Pull API image for local scan
+        run: docker pull ghcr.io/${{ steps.vars.outputs.repo }}/vortexflow-api:${{ github.sha }}
+
       - name: Trivy Scan API image
         uses: aquasecurity/trivy-action@v0.36.0
         with:
@@ -174,6 +177,9 @@ jobs:
           cache-from: type=gha
           cache-to: type=gha,mode=max
 
+      - name: Pull Worker image for local scan
+        run: docker pull ghcr.io/${{ steps.vars.outputs.repo }}/vortexflow-worker:${{ github.sha }}
+
       - name: Trivy Scan Worker image
         uses: aquasecurity/trivy-action@v0.36.0
         with:
@@ -204,6 +210,9 @@ jobs:
           labels: ${{ steps.meta-frontend.outputs.labels }}
           cache-from: type=gha
           cache-to: type=gha,mode=max
+
+      - name: Pull Frontend image for local scan
+        run: docker pull ghcr.io/${{ steps.vars.outputs.repo }}/vortexflow-frontend:${{ github.sha }}
 
       - name: Trivy Scan Frontend image
         uses: aquasecurity/trivy-action@v0.36.0
