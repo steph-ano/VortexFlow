@@ -119,11 +119,15 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
+      - name: Lowercase repository
+        id: vars
+        run: echo "repo=$(echo '${{ github.repository }}' | tr '[:upper:]' '[:lower:]')" >> $GITHUB_OUTPUT
+
       - name: Extract metadata for API
         id: meta-api
         uses: docker/metadata-action@v5
         with:
-          images: ghcr.io/${{ github.repository }}/vortexflow-api
+          images: ghcr.io/${{ steps.vars.outputs.repo }}/vortexflow-api
           tags: |
             type=sha,prefix=,suffix=,format=short
             type=raw,value=latest
@@ -142,7 +146,7 @@ jobs:
       - name: Trivy Scan API image
         uses: aquasecurity/trivy-action@v0.36.0
         with:
-          image-ref: ghcr.io/${{ github.repository }}/vortexflow-api:${{ github.sha }}
+          image-ref: ghcr.io/${{ steps.vars.outputs.repo }}/vortexflow-api:${{ github.sha }}
           format: table
           exit-code: 1
           severity: CRITICAL,HIGH
@@ -151,7 +155,7 @@ jobs:
         id: meta-worker
         uses: docker/metadata-action@v5
         with:
-          images: ghcr.io/${{ github.repository }}/vortexflow-worker
+          images: ghcr.io/${{ steps.vars.outputs.repo }}/vortexflow-worker
           tags: |
             type=sha,prefix=,suffix=,format=short
             type=raw,value=latest
@@ -170,7 +174,7 @@ jobs:
       - name: Trivy Scan Worker image
         uses: aquasecurity/trivy-action@v0.36.0
         with:
-          image-ref: ghcr.io/${{ github.repository }}/vortexflow-worker:${{ github.sha }}
+          image-ref: ghcr.io/${{ steps.vars.outputs.repo }}/vortexflow-worker:${{ github.sha }}
           format: table
           exit-code: 1
           severity: CRITICAL,HIGH
@@ -179,7 +183,7 @@ jobs:
         id: meta-frontend
         uses: docker/metadata-action@v5
         with:
-          images: ghcr.io/${{ github.repository }}/vortexflow-frontend
+          images: ghcr.io/${{ steps.vars.outputs.repo }}/vortexflow-frontend
           tags: |
             type=sha,prefix=,suffix=,format=short
             type=raw,value=latest
@@ -198,7 +202,7 @@ jobs:
       - name: Trivy Scan Frontend image
         uses: aquasecurity/trivy-action@v0.36.0
         with:
-          image-ref: ghcr.io/${{ github.repository }}/vortexflow-frontend:${{ github.sha }}
+          image-ref: ghcr.io/${{ steps.vars.outputs.repo }}/vortexflow-frontend:${{ github.sha }}
           format: table
           exit-code: 1
           severity: CRITICAL,HIGH
