@@ -1,5 +1,6 @@
 from pydantic_settings import BaseSettings
 
+
 class Settings(BaseSettings):
     RABBITMQ_URL: str = "amqp://guest:guest@localhost:5672//"
     REDIS_URL: str = "redis://localhost:6379/0"

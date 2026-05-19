@@ -1,13 +1,14 @@
-import httpx
-import json
 import uuid
+
+import httpx
 import structlog
-from app.worker import celery_app
-from app.config import settings
-from app.models.trend import TrendsProcessedEvent
 from kombu import Connection, Exchange, Producer
 from redis import Redis
-from tenacity import retry, stop_after_attempt, wait_exponential, retry_if_exception_type
+from tenacity import retry, retry_if_exception_type, stop_after_attempt, wait_exponential
+
+from app.config import settings
+from app.models.trend import TrendsProcessedEvent
+from app.worker import celery_app
 
 logger = structlog.get_logger()
 redis_client = Redis.from_url(settings.REDIS_URL)
@@ -24,16 +25,16 @@ def publish_trend_event(self, trend_dict: dict):
             timestamp=trend_dict["timestamp"],
             metrics=trend_dict["metrics"]
         )
-        
+
         cache_key = f"trend:current:{event.platform}:{event.hashtags[0]}"
         try:
             _cache_in_redis_with_retry(cache_key, event.model_dump_json())
         except Exception as redis_exc:
             logger.error(f"Failed to cache in Redis: {str(redis_exc)}")
-        
+
         _publish_to_rabbitmq(event)
         logger.info(f"Evento {event_id} publicado exitosamente en RabbitMQ.")
-        
+
     except Exception as exc:
         logger.warning(f"Fallo publicando en RabbitMQ, usando fallback HTTP: {str(exc)}")
         try:
@@ -50,11 +51,11 @@ def _cache_in_redis_with_retry(key: str, value: str):
 @retry(stop=stop_after_attempt(3), wait=wait_exponential(multiplier=1, min=2, max=10), reraise=True)
 def _publish_to_rabbitmq(event: TrendsProcessedEvent):
     exchange_name = "VortexFlow.Application.Events:TrendProcessedEvent"
-    
+
     with Connection(settings.RABBITMQ_URL) as conn:
         exchange = Exchange(exchange_name, type='fanout')
         producer = Producer(conn)
-        
+
         masstransit_message = {
             "messageId": event.eventId,
             "conversationId": str(uuid.uuid4()),
@@ -63,7 +64,7 @@ def _publish_to_rabbitmq(event: TrendsProcessedEvent):
             ],
             "message": event.model_dump()
         }
-        
+
         producer.publish(
             masstransit_message,
             exchange=exchange,
@@ -72,18 +73,23 @@ def _publish_to_rabbitmq(event: TrendsProcessedEvent):
             declare=[exchange]
         )
 
-@retry(stop=stop_after_attempt(3), wait=wait_exponential(multiplier=1, min=2, max=10), retry=retry_if_exception_type((httpx.RequestError, httpx.HTTPStatusError)), reraise=True)
+@retry(
+    stop=stop_after_attempt(3),
+    wait=wait_exponential(multiplier=1, min=2, max=10),
+    retry=retry_if_exception_type((httpx.RequestError, httpx.HTTPStatusError)),
+    reraise=True
+)
 def _publish_to_http_fallback(event: TrendsProcessedEvent):
     headers = {
         "Content-Type": "application/json",
         "Api-Key": settings.API_KEY_INTERNAL
     }
-    
+
     with httpx.Client() as client:
         response = client.post(
-            settings.DOTNET_INGEST_URL, 
-            json=event.model_dump(), 
-            headers=headers, 
+            settings.DOTNET_INGEST_URL,
+            json=event.model_dump(),
+            headers=headers,
             timeout=10
         )
         response.raise_for_status()

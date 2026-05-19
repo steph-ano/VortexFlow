@@ -1,20 +1,22 @@
-from fastapi import FastAPI, Depends, HTTPException, Security
-from fastapi.security.api_key import APIKeyHeader
-from contextlib import asynccontextmanager
-from pydantic import BaseModel
-import structlog
-from app.config import settings
-from app.tasks.scraping import scrape_all_platforms
-from redis import Redis
 import json
+import time as time_module
+from contextlib import asynccontextmanager
+
+import structlog
+from fastapi import Depends, FastAPI, HTTPException, Security
+from fastapi.security.api_key import APIKeyHeader
 from opentelemetry import trace
-from opentelemetry.sdk.trace import TracerProvider
-from opentelemetry.sdk.resources import Resource
 from opentelemetry.exporter.otlp.proto.grpc.trace_exporter import OTLPSpanExporter
-from opentelemetry.sdk.trace.export import BatchSpanProcessor
 from opentelemetry.instrumentation.fastapi import FastAPIInstrumentor
 from opentelemetry.instrumentation.httpx import HTTPXClientInstrumentor
-from prometheus_client import make_asgi_app, Counter, Histogram
+from opentelemetry.sdk.resources import Resource
+from opentelemetry.sdk.trace import TracerProvider
+from opentelemetry.sdk.trace.export import BatchSpanProcessor
+from prometheus_client import Counter, Histogram, make_asgi_app
+from redis import Redis
+
+from app.config import settings
+from app.tasks.scraping import scrape_all_platforms
 
 logger = structlog.get_logger()
 
@@ -31,7 +33,6 @@ processor = BatchSpanProcessor(OTLPSpanExporter(endpoint=otlp_endpoint, insecure
 provider.add_span_processor(processor)
 trace.set_tracer_provider(provider)
 
-# Metrics
 request_count = Counter(
     "vortexflow_http_requests_total",
     "Total HTTP requests",
@@ -60,8 +61,6 @@ FastAPIInstrumentor.instrument_app(app)
 metrics_app = make_asgi_app()
 app.mount("/metrics", metrics_app)
 
-import time as time_module
-
 api_key_header = APIKeyHeader(name="X-API-Key", auto_error=False)
 
 @app.middleware("http")
@@ -83,37 +82,30 @@ redis_client = Redis.from_url(settings.REDIS_URL)
 @app.get("/health")
 def health_check():
     health_status = {"status": "ok", "redis": "disconnected", "rabbitmq": "untested"}
-    
+
     try:
         if redis_client.ping():
             health_status["redis"] = "connected"
     except Exception as e:
         logger.error(f"Redis health check failed: {e}")
         health_status["status"] = "degraded"
-        
+
     return health_status
 
 @app.post("/trigger-scrape")
 def trigger_scrape(api_key: str = Depends(get_api_key)):
-    """
-    Endpoint para lanzar el scraping manualmente. 
-    Protegido por API Key.
-    """
     logger.info("Scraping manual trigger received.")
     scrape_all_platforms.delay()
     return {"message": "Scraping tasks triggered successfully"}
 
 @app.get("/trends/current")
 def get_current_trends():
-    """
-    Devuelve las últimas tendencias cacheadas en Redis.
-    """
     keys = redis_client.keys("trend:current:*")
     trends = []
-    
+
     for key in keys:
         data = redis_client.get(key)
         if data:
             trends.append(json.loads(data))
-            
+
     return {"count": len(trends), "trends": trends}
