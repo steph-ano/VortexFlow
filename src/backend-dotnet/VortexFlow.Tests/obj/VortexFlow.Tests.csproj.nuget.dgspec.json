@@ -1,0 +1,429 @@
+{
+  "format": 1,
+  "restore": {
+    "X:\\projects\\VortexFlow\\src\\backend-dotnet\\VortexFlow.Tests\\VortexFlow.Tests.csproj": {}
+  },
+  "projects": {
+    "X:\\projects\\VortexFlow\\src\\backend-dotnet\\VortexFlow.Api\\VortexFlow.Api.csproj": {
+      "version": "1.0.0",
+      "restore": {
+        "projectUniqueName": "X:\\projects\\VortexFlow\\src\\backend-dotnet\\VortexFlow.Api\\VortexFlow.Api.csproj",
+        "projectName": "VortexFlow.Api",
+        "projectPath": "X:\\projects\\VortexFlow\\src\\backend-dotnet\\VortexFlow.Api\\VortexFlow.Api.csproj",
+        "packagesPath": "C:\\Users\\Stephano\\.nuget\\packages\\",
+        "outputPath": "X:\\projects\\VortexFlow\\src\\backend-dotnet\\VortexFlow.Api\\obj\\",
+        "projectStyle": "PackageReference",
+        "configFilePaths": [
+          "C:\\Users\\Stephano\\AppData\\Roaming\\NuGet\\NuGet.Config"
+        ],
+        "originalTargetFrameworks": [
+          "net8.0"
+        ],
+        "sources": {
+          "https://api.nuget.org/v3/index.json": {}
+        },
+        "frameworks": {
+          "net8.0": {
+            "targetAlias": "net8.0",
+            "projectReferences": {
+              "X:\\projects\\VortexFlow\\src\\backend-dotnet\\VortexFlow.Application\\VortexFlow.Application.csproj": {
+                "projectPath": "X:\\projects\\VortexFlow\\src\\backend-dotnet\\VortexFlow.Application\\VortexFlow.Application.csproj"
+              },
+              "X:\\projects\\VortexFlow\\src\\backend-dotnet\\VortexFlow.Infrastructure\\VortexFlow.Infrastructure.csproj": {
+                "projectPath": "X:\\projects\\VortexFlow\\src\\backend-dotnet\\VortexFlow.Infrastructure\\VortexFlow.Infrastructure.csproj"
+              }
+            }
+          }
+        },
+        "warningProperties": {
+          "warnAsError": [
+            "NU1605"
+          ]
+        },
+        "restoreAuditProperties": {
+          "enableAudit": "true",
+          "auditLevel": "low",
+          "auditMode": "direct"
+        }
+      },
+      "frameworks": {
+        "net8.0": {
+          "targetAlias": "net8.0",
+          "dependencies": {
+            "Hangfire.AspNetCore": {
+              "target": "Package",
+              "version": "[1.8.23, )"
+            },
+            "Microsoft.AspNetCore.Authentication.JwtBearer": {
+              "target": "Package",
+              "version": "[8.0.0, )"
+            },
+            "Microsoft.EntityFrameworkCore.Tools": {
+              "include": "Runtime, Build, Native, ContentFiles, Analyzers, BuildTransitive",
+              "suppressParent": "All",
+              "target": "Package",
+              "version": "[8.0.0, )"
+            },
+            "Swashbuckle.AspNetCore": {
+              "target": "Package",
+              "version": "[6.6.2, )"
+            }
+          },
+          "imports": [
+            "net461",
+            "net462",
+            "net47",
+            "net471",
+            "net472",
+            "net48",
+            "net481"
+          ],
+          "assetTargetFallback": true,
+          "warn": true,
+          "frameworkReferences": {
+            "Microsoft.AspNetCore.App": {
+              "privateAssets": "none"
+            },
+            "Microsoft.NETCore.App": {
+              "privateAssets": "all"
+            }
+          },
+          "runtimeIdentifierGraphPath": "C:\\Program Files\\dotnet\\sdk\\8.0.417/PortableRuntimeIdentifierGraph.json"
+        }
+      }
+    },
+    "X:\\projects\\VortexFlow\\src\\backend-dotnet\\VortexFlow.Application\\VortexFlow.Application.csproj": {
+      "version": "1.0.0",
+      "restore": {
+        "projectUniqueName": "X:\\projects\\VortexFlow\\src\\backend-dotnet\\VortexFlow.Application\\VortexFlow.Application.csproj",
+        "projectName": "VortexFlow.Application",
+        "projectPath": "X:\\projects\\VortexFlow\\src\\backend-dotnet\\VortexFlow.Application\\VortexFlow.Application.csproj",
+        "packagesPath": "C:\\Users\\Stephano\\.nuget\\packages\\",
+        "outputPath": "X:\\projects\\VortexFlow\\src\\backend-dotnet\\VortexFlow.Application\\obj\\",
+        "projectStyle": "PackageReference",
+        "configFilePaths": [
+          "C:\\Users\\Stephano\\AppData\\Roaming\\NuGet\\NuGet.Config"
+        ],
+        "originalTargetFrameworks": [
+          "net8.0"
+        ],
+        "sources": {
+          "https://api.nuget.org/v3/index.json": {}
+        },
+        "frameworks": {
+          "net8.0": {
+            "targetAlias": "net8.0",
+            "projectReferences": {
+              "X:\\projects\\VortexFlow\\src\\backend-dotnet\\VortexFlow.Domain\\VortexFlow.Domain.csproj": {
+                "projectPath": "X:\\projects\\VortexFlow\\src\\backend-dotnet\\VortexFlow.Domain\\VortexFlow.Domain.csproj"
+              }
+            }
+          }
+        },
+        "warningProperties": {
+          "warnAsError": [
+            "NU1605"
+          ]
+        },
+        "restoreAuditProperties": {
+          "enableAudit": "true",
+          "auditLevel": "low",
+          "auditMode": "direct"
+        }
+      },
+      "frameworks": {
+        "net8.0": {
+          "targetAlias": "net8.0",
+          "dependencies": {
+            "Microsoft.EntityFrameworkCore": {
+              "target": "Package",
+              "version": "[8.0.0, )"
+            }
+          },
+          "imports": [
+            "net461",
+            "net462",
+            "net47",
+            "net471",
+            "net472",
+            "net48",
+            "net481"
+          ],
+          "assetTargetFallback": true,
+          "warn": true,
+          "frameworkReferences": {
+            "Microsoft.NETCore.App": {
+              "privateAssets": "all"
+            }
+          },
+          "runtimeIdentifierGraphPath": "C:\\Program Files\\dotnet\\sdk\\8.0.417/PortableRuntimeIdentifierGraph.json"
+        }
+      }
+    },
+    "X:\\projects\\VortexFlow\\src\\backend-dotnet\\VortexFlow.Domain\\VortexFlow.Domain.csproj": {
+      "version": "1.0.0",
+      "restore": {
+        "projectUniqueName": "X:\\projects\\VortexFlow\\src\\backend-dotnet\\VortexFlow.Domain\\VortexFlow.Domain.csproj",
+        "projectName": "VortexFlow.Domain",
+        "projectPath": "X:\\projects\\VortexFlow\\src\\backend-dotnet\\VortexFlow.Domain\\VortexFlow.Domain.csproj",
+        "packagesPath": "C:\\Users\\Stephano\\.nuget\\packages\\",
+        "outputPath": "X:\\projects\\VortexFlow\\src\\backend-dotnet\\VortexFlow.Domain\\obj\\",
+        "projectStyle": "PackageReference",
+        "configFilePaths": [
+          "C:\\Users\\Stephano\\AppData\\Roaming\\NuGet\\NuGet.Config"
+        ],
+        "originalTargetFrameworks": [
+          "net8.0"
+        ],
+        "sources": {
+          "https://api.nuget.org/v3/index.json": {}
+        },
+        "frameworks": {
+          "net8.0": {
+            "targetAlias": "net8.0",
+            "projectReferences": {}
+          }
+        },
+        "warningProperties": {
+          "warnAsError": [
+            "NU1605"
+          ]
+        },
+        "restoreAuditProperties": {
+          "enableAudit": "true",
+          "auditLevel": "low",
+          "auditMode": "direct"
+        }
+      },
+      "frameworks": {
+        "net8.0": {
+          "targetAlias": "net8.0",
+          "dependencies": {
+            "Microsoft.Extensions.Identity.Stores": {
+              "target": "Package",
+              "version": "[8.0.0, )"
+            }
+          },
+          "imports": [
+            "net461",
+            "net462",
+            "net47",
+            "net471",
+            "net472",
+            "net48",
+            "net481"
+          ],
+          "assetTargetFallback": true,
+          "warn": true,
+          "frameworkReferences": {
+            "Microsoft.NETCore.App": {
+              "privateAssets": "all"
+            }
+          },
+          "runtimeIdentifierGraphPath": "C:\\Program Files\\dotnet\\sdk\\8.0.417/PortableRuntimeIdentifierGraph.json"
+        }
+      }
+    },
+    "X:\\projects\\VortexFlow\\src\\backend-dotnet\\VortexFlow.Infrastructure\\VortexFlow.Infrastructure.csproj": {
+      "version": "1.0.0",
+      "restore": {
+        "projectUniqueName": "X:\\projects\\VortexFlow\\src\\backend-dotnet\\VortexFlow.Infrastructure\\VortexFlow.Infrastructure.csproj",
+        "projectName": "VortexFlow.Infrastructure",
+        "projectPath": "X:\\projects\\VortexFlow\\src\\backend-dotnet\\VortexFlow.Infrastructure\\VortexFlow.Infrastructure.csproj",
+        "packagesPath": "C:\\Users\\Stephano\\.nuget\\packages\\",
+        "outputPath": "X:\\projects\\VortexFlow\\src\\backend-dotnet\\VortexFlow.Infrastructure\\obj\\",
+        "projectStyle": "PackageReference",
+        "configFilePaths": [
+          "C:\\Users\\Stephano\\AppData\\Roaming\\NuGet\\NuGet.Config"
+        ],
+        "originalTargetFrameworks": [
+          "net8.0"
+        ],
+        "sources": {
+          "https://api.nuget.org/v3/index.json": {}
+        },
+        "frameworks": {
+          "net8.0": {
+            "targetAlias": "net8.0",
+            "projectReferences": {
+              "X:\\projects\\VortexFlow\\src\\backend-dotnet\\VortexFlow.Application\\VortexFlow.Application.csproj": {
+                "projectPath": "X:\\projects\\VortexFlow\\src\\backend-dotnet\\VortexFlow.Application\\VortexFlow.Application.csproj"
+              },
+              "X:\\projects\\VortexFlow\\src\\backend-dotnet\\VortexFlow.Domain\\VortexFlow.Domain.csproj": {
+                "projectPath": "X:\\projects\\VortexFlow\\src\\backend-dotnet\\VortexFlow.Domain\\VortexFlow.Domain.csproj"
+              }
+            }
+          }
+        },
+        "warningProperties": {
+          "warnAsError": [
+            "NU1605"
+          ]
+        },
+        "restoreAuditProperties": {
+          "enableAudit": "true",
+          "auditLevel": "low",
+          "auditMode": "direct"
+        }
+      },
+      "frameworks": {
+        "net8.0": {
+          "targetAlias": "net8.0",
+          "dependencies": {
+            "Hangfire.Core": {
+              "target": "Package",
+              "version": "[1.8.23, )"
+            },
+            "Hangfire.PostgreSql": {
+              "target": "Package",
+              "version": "[1.21.1, )"
+            },
+            "MassTransit.RabbitMQ": {
+              "target": "Package",
+              "version": "[9.1.1, )"
+            },
+            "Microsoft.AspNetCore.Identity.EntityFrameworkCore": {
+              "target": "Package",
+              "version": "[8.0.0, )"
+            },
+            "Microsoft.EntityFrameworkCore.Design": {
+              "include": "Runtime, Build, Native, ContentFiles, Analyzers, BuildTransitive",
+              "suppressParent": "All",
+              "target": "Package",
+              "version": "[8.0.0, )"
+            },
+            "Microsoft.Extensions.Http.Polly": {
+              "target": "Package",
+              "version": "[10.0.8, )"
+            },
+            "Npgsql.EntityFrameworkCore.PostgreSQL": {
+              "target": "Package",
+              "version": "[8.0.0, )"
+            },
+            "StackExchange.Redis": {
+              "target": "Package",
+              "version": "[2.13.1, )"
+            }
+          },
+          "imports": [
+            "net461",
+            "net462",
+            "net47",
+            "net471",
+            "net472",
+            "net48",
+            "net481"
+          ],
+          "assetTargetFallback": true,
+          "warn": true,
+          "frameworkReferences": {
+            "Microsoft.AspNetCore.App": {
+              "privateAssets": "none"
+            },
+            "Microsoft.NETCore.App": {
+              "privateAssets": "all"
+            }
+          },
+          "runtimeIdentifierGraphPath": "C:\\Program Files\\dotnet\\sdk\\8.0.417/PortableRuntimeIdentifierGraph.json"
+        }
+      }
+    },
+    "X:\\projects\\VortexFlow\\src\\backend-dotnet\\VortexFlow.Tests\\VortexFlow.Tests.csproj": {
+      "version": "1.0.0",
+      "restore": {
+        "projectUniqueName": "X:\\projects\\VortexFlow\\src\\backend-dotnet\\VortexFlow.Tests\\VortexFlow.Tests.csproj",
+        "projectName": "VortexFlow.Tests",
+        "projectPath": "X:\\projects\\VortexFlow\\src\\backend-dotnet\\VortexFlow.Tests\\VortexFlow.Tests.csproj",
+        "packagesPath": "C:\\Users\\Stephano\\.nuget\\packages\\",
+        "outputPath": "X:\\projects\\VortexFlow\\src\\backend-dotnet\\VortexFlow.Tests\\obj\\",
+        "projectStyle": "PackageReference",
+        "configFilePaths": [
+          "C:\\Users\\Stephano\\AppData\\Roaming\\NuGet\\NuGet.Config"
+        ],
+        "originalTargetFrameworks": [
+          "net8.0"
+        ],
+        "sources": {
+          "https://api.nuget.org/v3/index.json": {}
+        },
+        "frameworks": {
+          "net8.0": {
+            "targetAlias": "net8.0",
+            "projectReferences": {
+              "X:\\projects\\VortexFlow\\src\\backend-dotnet\\VortexFlow.Api\\VortexFlow.Api.csproj": {
+                "projectPath": "X:\\projects\\VortexFlow\\src\\backend-dotnet\\VortexFlow.Api\\VortexFlow.Api.csproj"
+              },
+              "X:\\projects\\VortexFlow\\src\\backend-dotnet\\VortexFlow.Application\\VortexFlow.Application.csproj": {
+                "projectPath": "X:\\projects\\VortexFlow\\src\\backend-dotnet\\VortexFlow.Application\\VortexFlow.Application.csproj"
+              },
+              "X:\\projects\\VortexFlow\\src\\backend-dotnet\\VortexFlow.Domain\\VortexFlow.Domain.csproj": {
+                "projectPath": "X:\\projects\\VortexFlow\\src\\backend-dotnet\\VortexFlow.Domain\\VortexFlow.Domain.csproj"
+              },
+              "X:\\projects\\VortexFlow\\src\\backend-dotnet\\VortexFlow.Infrastructure\\VortexFlow.Infrastructure.csproj": {
+                "projectPath": "X:\\projects\\VortexFlow\\src\\backend-dotnet\\VortexFlow.Infrastructure\\VortexFlow.Infrastructure.csproj"
+              }
+            }
+          }
+        },
+        "warningProperties": {
+          "warnAsError": [
+            "NU1605"
+          ]
+        },
+        "restoreAuditProperties": {
+          "enableAudit": "true",
+          "auditLevel": "low",
+          "auditMode": "direct"
+        }
+      },
+      "frameworks": {
+        "net8.0": {
+          "targetAlias": "net8.0",
+          "dependencies": {
+            "MassTransit": {
+              "target": "Package",
+              "version": "[9.1.1, )"
+            },
+            "Microsoft.NET.Test.Sdk": {
+              "target": "Package",
+              "version": "[17.8.0, )"
+            },
+            "Moq": {
+              "target": "Package",
+              "version": "[4.20.72, )"
+            },
+            "coverlet.collector": {
+              "target": "Package",
+              "version": "[6.0.0, )"
+            },
+            "xunit": {
+              "target": "Package",
+              "version": "[2.5.3, )"
+            },
+            "xunit.runner.visualstudio": {
+              "target": "Package",
+              "version": "[2.5.3, )"
+            }
+          },
+          "imports": [
+            "net461",
+            "net462",
+            "net47",
+            "net471",
+            "net472",
+            "net48",
+            "net481"
+          ],
+          "assetTargetFallback": true,
+          "warn": true,
+          "frameworkReferences": {
+            "Microsoft.NETCore.App": {
+              "privateAssets": "all"
+            }
+          },
+          "runtimeIdentifierGraphPath": "C:\\Program Files\\dotnet\\sdk\\8.0.417/PortableRuntimeIdentifierGraph.json"
+        }
+      }
+    }
+  }
+}

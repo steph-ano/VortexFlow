@@ -1,0 +1,109 @@
+version: '3.8'
+
+services:
+  # Infrastructure
+  postgres:
+    image: timescale/timescaledb:latest-pg15
+    container_name: vortexflow-db
+    environment:
+      POSTGRES_DB: vortexflow_db
+      POSTGRES_USER: vortexflow_user
+      POSTGRES_PASSWORD: vortexflow_pass
+    ports:
+      - "5432:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U vortexflow_user -d vortexflow_db"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+    restart: unless-stopped
+
+  redis:
+    image: redis:7-alpine
+    container_name: vortexflow-redis
+    ports:
+      - "6379:6379"
+    volumes:
+      - redisdata:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+    restart: unless-stopped
+
+  rabbitmq:
+    image: rabbitmq:3-management-alpine
+    container_name: vortexflow-rabbitmq
+    ports:
+      - "5672:5672"
+      - "15672:15672"
+    volumes:
+      - rabbitmqdata:/var/lib/rabbitmq
+    healthcheck:
+      test: rabbitmq-diagnostics -q ping
+      interval: 5s
+      timeout: 5s
+      retries: 5
+    restart: unless-stopped
+
+  # Backend Services
+  vortexflow-api:
+    build:
+      context: .
+      dockerfile: docker/dotnet.Dockerfile
+    container_name: vortexflow-api
+    ports:
+      - "5032:8080"
+    environment:
+      - ConnectionStrings__DefaultConnection=Host=postgres;Port=5432;Database=vortexflow_db;Username=vortexflow_user;Password=vortexflow_pass
+      - Redis__ConnectionString=redis:6379
+      - RabbitMQ__Host=rabbitmq
+      - JwtSettings__Secret=VortexFlowSuperSecretKeyForDevelopment2026!
+      - ASPNETCORE_ENVIRONMENT=Development
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+
+  vortexflow-worker:
+    build:
+      context: .
+      dockerfile: docker/python.Dockerfile
+    container_name: vortexflow-worker
+    ports:
+      - "8000:8000"
+    environment:
+      - DATABASE_URL=postgresql://vortexflow_user:vortexflow_pass@postgres:5432/vortexflow_db
+      - REDIS_URL=redis://redis:6379/0
+      - RABBITMQ_URL=amqp://guest:guest@rabbitmq:5672//
+      - DOTNET_INGEST_URL=http://vortexflow-api:8080/api/trends/ingest
+      - API_KEY_INTERNAL=internal_dev_key
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+
+  # Frontend
+  vortexflow-frontend:
+    build:
+      context: .
+      dockerfile: docker/frontend.Dockerfile
+    container_name: vortexflow-frontend
+    ports:
+      - "5173:80"
+    depends_on:
+      - vortexflow-api
+
+volumes:
+  pgdata:
+  redisdata:
+  rabbitmqdata:

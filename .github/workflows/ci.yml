@@ -1,0 +1,204 @@
+name: VortexFlow CI/CD
+
+on:
+  push:
+    branches:
+      - main
+      - develop
+  pull_request:
+    branches:
+      - main
+      - develop
+
+jobs:
+  dotnet-build:
+    name: .NET Build & Test
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: Setup .NET 8
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 8.0.x
+          
+      - name: Restore dependencies
+        run: dotnet restore ./src/backend-dotnet/VortexFlow.sln
+      - name: Security Audit (NuGet)
+        run: dotnet list ./src/backend-dotnet/VortexFlow.sln package --vulnerable --include-transitive
+      - name: Build
+        run: dotnet build ./src/backend-dotnet/VortexFlow.sln --no-restore
+      - name: Test
+        run: dotnet test ./src/backend-dotnet/VortexFlow.sln --no-build --verbosity normal
+
+  python-lint:
+    name: Python Lint & Test
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: Setup Python 3.11
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+          
+      - name: Install Poetry
+        uses: snok/install-poetry@v1
+        with:
+          virtualenvs-create: true
+          virtualenvs-in-project: true
+          
+      - name: Install dependencies
+        working-directory: ./src/backend-python
+        run: poetry install
+      - name: Security Audit (Pip-Audit)
+        working-directory: ./src/backend-python
+        run: |
+          poetry add --group dev pip-audit
+          poetry run pip-audit
+      - name: Lint with ruff
+        working-directory: ./src/backend-python
+        run: poetry run ruff check .
+      - name: Test with pytest
+        working-directory: ./src/backend-python
+        run: poetry run pytest
+
+  frontend-build:
+    name: Frontend Build & Lint
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js 20
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          
+      - name: Install dependencies
+        working-directory: ./src/frontend
+        run: npm ci
+      - name: Security Audit (NPM Audit)
+        working-directory: ./src/frontend
+        run: npm audit --audit-level=high || true
+      - name: Lint
+        working-directory: ./src/frontend
+        run: npm run lint
+      - name: Build
+        working-directory: ./src/frontend
+        run: npm run build
+
+  docker-build:
+    name: Docker Build, Scan & Deploy
+    runs-on: ubuntu-latest
+    needs: [dotnet-build, python-lint, frontend-build]
+    if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: Set up QEMU
+        uses: docker/setup-qemu-action@v3
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Log in to GitHub Container Registry
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Extract metadata for API
+        id: meta-api
+        uses: docker/metadata-action@v5
+        with:
+          images: ghcr.io/${{ github.repository }}/vortexflow-api
+          tags: |
+            type=sha,prefix=,suffix=,format=short
+            type=raw,value=latest
+
+      - name: Build & Push API image
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          file: docker/dotnet.Dockerfile
+          push: true
+          tags: ${{ steps.meta-api.outputs.tags }}
+          labels: ${{ steps.meta-api.outputs.labels }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      - name: Trivy Scan API image
+        uses: aquasecurity/trivy-action@v0.28.0
+        with:
+          image-ref: ghcr.io/${{ github.repository }}/vortexflow-api:${{ github.sha }}
+          format: table
+          exit-code: 1
+          severity: CRITICAL,HIGH
+
+      - name: Extract metadata for Worker
+        id: meta-worker
+        uses: docker/metadata-action@v5
+        with:
+          images: ghcr.io/${{ github.repository }}/vortexflow-worker
+          tags: |
+            type=sha,prefix=,suffix=,format=short
+            type=raw,value=latest
+
+      - name: Build & Push Worker image
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          file: docker/python.Dockerfile
+          push: true
+          tags: ${{ steps.meta-worker.outputs.tags }}
+          labels: ${{ steps.meta-worker.outputs.labels }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      - name: Trivy Scan Worker image
+        uses: aquasecurity/trivy-action@v0.28.0
+        with:
+          image-ref: ghcr.io/${{ github.repository }}/vortexflow-worker:${{ github.sha }}
+          format: table
+          exit-code: 1
+          severity: CRITICAL,HIGH
+
+      - name: Extract metadata for Frontend
+        id: meta-frontend
+        uses: docker/metadata-action@v5
+        with:
+          images: ghcr.io/${{ github.repository }}/vortexflow-frontend
+          tags: |
+            type=sha,prefix=,suffix=,format=short
+            type=raw,value=latest
+
+      - name: Build & Push Frontend image
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          file: docker/frontend.Dockerfile
+          push: true
+          tags: ${{ steps.meta-frontend.outputs.tags }}
+          labels: ${{ steps.meta-frontend.outputs.labels }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      - name: Trivy Scan Frontend image
+        uses: aquasecurity/trivy-action@v0.28.0
+        with:
+          image-ref: ghcr.io/${{ github.repository }}/vortexflow-frontend:${{ github.sha }}
+          format: table
+          exit-code: 1
+          severity: CRITICAL,HIGH
+
+      - name: Validate Kubernetes manifests
+        run: |
+          for f in k8s/*.yaml; do
+            echo "Validating $f..."
+            kubectl apply --dry-run=client -f "$f" 2>&1 || true
+          done

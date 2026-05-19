@@ -1,0 +1,11 @@
+{
+  "Version": 1,
+  "Hash": "kRUGOAUMl6u4YyDkV8DMDYbKkYV4vPFbwYHUxpATRDw=",
+  "Source": "VortexFlow.Api",
+  "BasePath": "_content/VortexFlow.Api",
+  "Mode": "Default",
+  "ManifestType": "Build",
+  "ReferencedProjectsConfiguration": [],
+  "DiscoveryPatterns": [],
+  "Assets": []
+}

@@ -1,0 +1,35 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: vortexflow-api-config
+  namespace: vortexflow
+data:
+  ASPNETCORE_ENVIRONMENT: "Production"
+  ASPNETCORE_URLS: "http://+:8080"
+  Jwt__ValidAudience: "VortexFlowClient"
+  Jwt__ValidIssuer: "VortexFlowApi"
+  ConnectionStrings__Postgres: "Host=postgres;Port=5432;Database=vortexflow_db;Username=vortexflow_user;Password=vortexflow_pass"
+  ConnectionStrings__Redis: "redis:6379"
+  ConnectionStrings__RabbitMq: "amqp://guest:guest@rabbitmq:5672/"
+  Otlp__Endpoint: "http://otel-collector:4317"
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: vortexflow-worker-config
+  namespace: vortexflow
+data:
+  DATABASE_URL: "postgresql://vortexflow_user:vortexflow_pass@postgres:5432/vortexflow_db"
+  REDIS_URL: "redis://redis:6379/0"
+  RABBITMQ_URL: "amqp://guest:guest@rabbitmq:5672//"
+  DOTNET_INGEST_URL: "http://vortexflow-api:8080/api/trends/ingest"
+  API_KEY_INTERNAL: "VORTEX_INTERNAL_DEV_KEY_999"
+  OTLP_ENDPOINT: "http://otel-collector:4317"
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: vortexflow-frontend-config
+  namespace: vortexflow
+data:
+  VITE_API_BASE_URL: "/api"

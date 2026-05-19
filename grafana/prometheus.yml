@@ -1,0 +1,20 @@
+global:
+  scrape_interval: 15s
+  evaluation_interval: 15s
+
+scrape_configs:
+  - job_name: 'vortexflow-api'
+    static_configs:
+      - targets: ['host.docker.internal:5032']
+        labels:
+          service: 'vortexflow-api'
+
+  - job_name: 'vortexflow-worker'
+    static_configs:
+      - targets: ['host.docker.internal:8000']
+        labels:
+          service: 'vortexflow-worker'
+
+  - job_name: 'prometheus'
+    static_configs:
+      - targets: ['localhost:9090']

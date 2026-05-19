@@ -1,0 +1,114 @@
+version: '3.8'
+
+services:
+  postgres:
+    image: timescale/timescaledb:latest-pg15
+    container_name: vortexflow-db-prod
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB}
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+    volumes:
+      - pgdata-prod:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER} -d ${POSTGRES_DB}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    restart: always
+    networks:
+      - vortexflow-network
+
+  redis:
+    image: redis:7-alpine
+    container_name: vortexflow-redis-prod
+    volumes:
+      - redisdata-prod:/data
+    command: redis-server --requirepass ${REDIS_PASSWORD}
+    healthcheck:
+      test: ["CMD", "redis-cli", "-a", "${REDIS_PASSWORD}", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    restart: always
+    networks:
+      - vortexflow-network
+
+  rabbitmq:
+    image: rabbitmq:3-management-alpine
+    container_name: vortexflow-rabbitmq-prod
+    environment:
+      RABBITMQ_DEFAULT_USER: ${RABBITMQ_USER}
+      RABBITMQ_DEFAULT_PASS: ${RABBITMQ_PASSWORD}
+    volumes:
+      - rabbitmqdata-prod:/var/lib/rabbitmq
+    healthcheck:
+      test: rabbitmq-diagnostics -q ping
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    restart: always
+    networks:
+      - vortexflow-network
+
+  vortexflow-api:
+    image: ghcr.io/tu-organizacion/vortexflow-api:latest
+    container_name: vortexflow-api-prod
+    environment:
+      - ConnectionStrings__DefaultConnection=Host=postgres;Port=5432;Database=${POSTGRES_DB};Username=${POSTGRES_USER};Password=${POSTGRES_PASSWORD}
+      - Redis__ConnectionString=redis:6379,password=${REDIS_PASSWORD}
+      - RabbitMQ__Host=rabbitmq
+      - RabbitMQ__Username=${RABBITMQ_USER}
+      - RabbitMQ__Password=${RABBITMQ_PASSWORD}
+      - JwtSettings__Secret=${JWT_SECRET}
+      - ASPNETCORE_ENVIRONMENT=Production
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+    restart: always
+    networks:
+      - vortexflow-network
+
+  vortexflow-worker:
+    image: ghcr.io/tu-organizacion/vortexflow-worker:latest
+    container_name: vortexflow-worker-prod
+    environment:
+      - DATABASE_URL=postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB}
+      - REDIS_URL=redis://:${REDIS_PASSWORD}@redis:6379/0
+      - RABBITMQ_URL=amqp://${RABBITMQ_USER}:${RABBITMQ_PASSWORD}@rabbitmq:5672//
+      - DOTNET_INGEST_URL=http://vortexflow-api:8080/api/trends/ingest
+      - API_KEY_INTERNAL=${API_KEY_INTERNAL}
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+    restart: always
+    networks:
+      - vortexflow-network
+
+  vortexflow-frontend:
+    image: ghcr.io/tu-organizacion/vortexflow-frontend:latest
+    container_name: vortexflow-frontend-prod
+    ports:
+      - "80:80"
+    depends_on:
+      - vortexflow-api
+    restart: always
+    networks:
+      - vortexflow-network
+
+volumes:
+  pgdata-prod:
+  redisdata-prod:
+  rabbitmqdata-prod:
+
+networks:
+  vortexflow-network:
+    driver: bridge

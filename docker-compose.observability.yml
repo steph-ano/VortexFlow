@@ -1,0 +1,83 @@
+version: '3.8'
+
+services:
+  otel-collector:
+    image: otel/opentelemetry-collector-contrib:latest
+    container_name: vortexflow-otelcol
+    command: ["--config=/etc/otel-collector-config.yaml"]
+    volumes:
+      - ./grafana/otel-collector-config.yaml:/etc/otel-collector-config.yaml
+    ports:
+      - "4317:4317"   # OTLP gRPC
+      - "4318:4318"   # OTLP HTTP
+      - "8888:8888"   # Prometheus metrics
+      - "8889:8889"   # Prometheus exporter
+    depends_on:
+      - prometheus
+      - loki
+      - tempo
+    networks:
+      - vortexflow-network
+
+  prometheus:
+    image: prom/prometheus:latest
+    container_name: vortexflow-prometheus
+    volumes:
+      - ./grafana/prometheus.yml:/etc/prometheus/prometheus.yml
+      - prometheus_data:/prometheus
+    ports:
+      - "9090:9090"
+    command:
+      - '--config.file=/etc/prometheus/prometheus.yml'
+      - '--storage.tsdb.path=/prometheus'
+    networks:
+      - vortexflow-network
+
+  loki:
+    image: grafana/loki:latest
+    container_name: vortexflow-loki
+    ports:
+      - "3100:3100"
+    command: -config.file=/etc/loki/local-config.yaml
+    networks:
+      - vortexflow-network
+
+  tempo:
+    image: grafana/tempo:2.4.1
+    container_name: vortexflow-tempo
+    command: [ "-config.file=/etc/tempo.yaml" ]
+    volumes:
+      - ./grafana/tempo.yaml:/etc/tempo.yaml
+    ports:
+      - "3200:3200"
+      - "4317:4317"
+      - "4318:4318"
+    networks:
+      - vortexflow-network
+
+  grafana:
+    image: grafana/grafana:10.4.3
+    container_name: vortexflow-grafana
+    ports:
+      - "3000:3000"
+    volumes:
+      - ./grafana/provisioning/datasources:/etc/grafana/provisioning/datasources
+      - ./grafana/provisioning/dashboards:/etc/grafana/provisioning/dashboards
+      - ./grafana/dashboards:/var/lib/grafana/dashboards
+    environment:
+      - GF_SECURITY_ADMIN_USER=admin
+      - GF_SECURITY_ADMIN_PASSWORD=admin
+      - GF_USERS_ALLOW_SIGN_UP=false
+    depends_on:
+      - prometheus
+      - loki
+      - tempo
+    networks:
+      - vortexflow-network
+
+volumes:
+  prometheus_data:
+
+networks:
+  vortexflow-network:
+    external: true

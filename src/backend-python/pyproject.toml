@@ -1,0 +1,23 @@
+[tool.poetry]
+name = "backend-python"
+version = "0.1.0"
+description = "VortexFlow Tactical Specialist API"
+authors = ["Admin <admin@vortexflow.local>"]
+
+[tool.poetry.dependencies]
+python = "^3.11"
+fastapi = "*"
+uvicorn = {extras = ["standard"], version = "*"}
+celery = "*"
+redis = "*"
+kombu = "*"
+httpx = "*"
+tenacity = "*"
+structlog = "*"
+python-dotenv = "*"
+pydantic = "*"
+pydantic-settings = "*"
+
+[build-system]
+requires = ["poetry-core>=1.0.0"]
+build-backend = "poetry.core.masonry.api"

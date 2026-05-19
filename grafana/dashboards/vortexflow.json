@@ -1,0 +1,136 @@
+{
+  "__inputs": [],
+  "__requires": [],
+  "title": "VortexFlow",
+  "uid": "vortexflow",
+  "version": 2,
+  "timezone": "utc",
+  "editable": true,
+  "refresh": "30s",
+  "tags": ["vortexflow", "observability"],
+  "time": { "from": "now-1h", "to": "now" },
+  "panels": [
+    {
+      "title": "API Latency (p50, p95, p99)",
+      "type": "timeseries",
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 0 },
+      "id": 1,
+      "targets": [
+        {
+          "expr": "histogram_quantile(0.50, sum(rate(http_server_request_duration_seconds_bucket{http_route!=\"/metrics\"}[2m])) by (le))",
+          "legendFormat": "p50",
+          "refId": "A"
+        },
+        {
+          "expr": "histogram_quantile(0.95, sum(rate(http_server_request_duration_seconds_bucket{http_route!=\"/metrics\"}[2m])) by (le))",
+          "legendFormat": "p95",
+          "refId": "B"
+        },
+        {
+          "expr": "histogram_quantile(0.99, sum(rate(http_server_request_duration_seconds_bucket{http_route!=\"/metrics\"}[2m])) by (le))",
+          "legendFormat": "p99",
+          "refId": "C"
+        }
+      ],
+      "options": {
+        "legend": { "calcs": ["mean", "max"], "displayMode": "table", "placement": "bottom" }
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "s",
+          "custom": { "lineInterpolation": "smooth" }
+        }
+      }
+    },
+    {
+      "title": "Tendencias Recolectadas por Minuto",
+      "type": "timeseries",
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 0 },
+      "id": 2,
+      "targets": [
+        {
+          "expr": "sum(rate(vortexflow_trends_ingested_total[1m]))",
+          "legendFormat": "tendencias/min",
+          "refId": "A"
+        }
+      ],
+      "options": {
+        "legend": { "calcs": ["mean", "max"], "displayMode": "table", "placement": "bottom" }
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "cpm",
+          "custom": { "lineInterpolation": "smooth" }
+        }
+      }
+    },
+    {
+      "title": "Publicaciones Exitosas vs Fallidas",
+      "type": "stat",
+      "gridPos": { "h": 8, "w": 6, "x": 0, "y": 8 },
+      "id": 3,
+      "targets": [
+        {
+          "expr": "sum(vortexflow_posts_published_total)",
+          "legendFormat": "Exitosas",
+          "refId": "A"
+        },
+        {
+          "expr": "sum(vortexflow_posts_failed_total)",
+          "legendFormat": "Fallidas",
+          "refId": "B"
+        }
+      ],
+      "options": {
+        "reduceOptions": { "calcs": ["lastNotNull"] },
+        "orientation": "horizontal",
+        "textMode": "value_and_name"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "color": { "mode": "fixed" },
+          "mappings": [],
+          "thresholds": { "mode": "absolute", "steps": [{ "value": null, "color": "green" }] },
+          "unit": "none"
+        }
+      }
+    },
+    {
+      "title": "Estado de Circuit Breakers (Redis)",
+      "type": "stat",
+      "gridPos": { "h": 8, "w": 6, "x": 6, "y": 8 },
+      "id": 4,
+      "targets": [
+        {
+          "expr": "vortexflow_circuit_breaker_state",
+          "legendFormat": "{{breaker}}",
+          "refId": "A"
+        }
+      ],
+      "options": {
+        "reduceOptions": { "calcs": ["lastNotNull"] },
+        "orientation": "auto",
+        "textMode": "value_and_name"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "color": { "mode": "thresholds" },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "value": null, "color": "green" },
+              { "value": 1, "color": "orange" },
+              { "value": 2, "color": "red" }
+            ]
+          },
+          "mappings": [
+            { "type": "value", "options": { "0": { "text": "Closed", "color": "green" }, "1": { "text": "Open", "color": "red" }, "2": { "text": "Half-Open", "color": "orange" } } }
+          ],
+          "unit": "none"
+        },
+        "overrides": []
+      }
+    }
+  ],
+  "schemaVersion": 36
+}

@@ -1,0 +1,46 @@
+﻿
+Microsoft Visual Studio Solution File, Format Version 12.00
+# Visual Studio Version 17
+VisualStudioVersion = 17.0.31903.59
+MinimumVisualStudioVersion = 10.0.40219.1
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "VortexFlow.Api", "VortexFlow.Api\VortexFlow.Api.csproj", "{97B8DE13-2F99-4EC2-ACD6-D310A8081725}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "VortexFlow.Domain", "VortexFlow.Domain\VortexFlow.Domain.csproj", "{303CD3CC-BBEC-4CDA-AE62-752FECA9F2A5}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "VortexFlow.Application", "VortexFlow.Application\VortexFlow.Application.csproj", "{967CCA50-B6CA-4FDE-B6C7-D239602AAC7B}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "VortexFlow.Infrastructure", "VortexFlow.Infrastructure\VortexFlow.Infrastructure.csproj", "{AE842E09-14FC-4E01-AAF9-5F5EAA37718C}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "VortexFlow.Tests", "VortexFlow.Tests\VortexFlow.Tests.csproj", "{AD330D08-1FA1-4C1C-B77B-ACF734917FFC}"
+EndProject
+Global
+	GlobalSection(SolutionConfigurationPlatforms) = preSolution
+		Debug|Any CPU = Debug|Any CPU
+		Release|Any CPU = Release|Any CPU
+	EndGlobalSection
+	GlobalSection(SolutionProperties) = preSolution
+		HideSolutionNode = FALSE
+	EndGlobalSection
+	GlobalSection(ProjectConfigurationPlatforms) = postSolution
+		{97B8DE13-2F99-4EC2-ACD6-D310A8081725}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{97B8DE13-2F99-4EC2-ACD6-D310A8081725}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{97B8DE13-2F99-4EC2-ACD6-D310A8081725}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{97B8DE13-2F99-4EC2-ACD6-D310A8081725}.Release|Any CPU.Build.0 = Release|Any CPU
+		{303CD3CC-BBEC-4CDA-AE62-752FECA9F2A5}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{303CD3CC-BBEC-4CDA-AE62-752FECA9F2A5}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{303CD3CC-BBEC-4CDA-AE62-752FECA9F2A5}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{303CD3CC-BBEC-4CDA-AE62-752FECA9F2A5}.Release|Any CPU.Build.0 = Release|Any CPU
+		{967CCA50-B6CA-4FDE-B6C7-D239602AAC7B}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{967CCA50-B6CA-4FDE-B6C7-D239602AAC7B}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{967CCA50-B6CA-4FDE-B6C7-D239602AAC7B}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{967CCA50-B6CA-4FDE-B6C7-D239602AAC7B}.Release|Any CPU.Build.0 = Release|Any CPU
+		{AE842E09-14FC-4E01-AAF9-5F5EAA37718C}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{AE842E09-14FC-4E01-AAF9-5F5EAA37718C}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{AE842E09-14FC-4E01-AAF9-5F5EAA37718C}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{AE842E09-14FC-4E01-AAF9-5F5EAA37718C}.Release|Any CPU.Build.0 = Release|Any CPU
+		{AD330D08-1FA1-4C1C-B77B-ACF734917FFC}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{AD330D08-1FA1-4C1C-B77B-ACF734917FFC}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{AD330D08-1FA1-4C1C-B77B-ACF734917FFC}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{AD330D08-1FA1-4C1C-B77B-ACF734917FFC}.Release|Any CPU.Build.0 = Release|Any CPU
+	EndGlobalSection
+EndGlobal

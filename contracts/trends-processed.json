@@ -1,0 +1,59 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "TrendsProcessed",
+  "description": "Evento emitido por el Especialista Táctico (Python) hacia el Cerebro Transaccional (.NET) cuando se han procesado nuevas tendencias.",
+  "type": "object",
+  "properties": {
+    "eventId": {
+      "type": "string",
+      "format": "uuid",
+      "description": "Identificador único del evento."
+    },
+    "timestamp": {
+      "type": "string",
+      "format": "date-time",
+      "description": "Fecha y hora en que se generó el evento."
+    },
+    "source": {
+      "type": "string",
+      "description": "Plataforma de origen (ej. 'twitter', 'tiktok', 'linkedin')."
+    },
+    "hashtags": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      },
+      "description": "Lista de hashtags extraídos de la tendencia."
+    },
+    "metrics": {
+      "type": "object",
+      "properties": {
+        "volume": {
+          "type": "integer",
+          "description": "Volumen de menciones."
+        },
+        "sentiment": {
+          "type": "number",
+          "description": "Puntuación de sentimiento, por ejemplo de -1.0 a 1.0."
+        }
+      },
+      "required": ["volume", "sentiment"]
+    },
+    "platform": {
+      "type": "string",
+      "description": "Plataforma en la que la tendencia fue observada (puede ser igual a source o un sub-canal)."
+    },
+    "rawData": {
+      "type": "object",
+      "description": "Datos crudos adicionales si se requiere contexto extra."
+    }
+  },
+  "required": [
+    "eventId",
+    "timestamp",
+    "source",
+    "hashtags",
+    "metrics",
+    "platform"
+  ]
+}

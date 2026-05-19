@@ -1,0 +1,12 @@
+X:\projects\VortexFlow\src\backend-dotnet\VortexFlow.Domain\bin\Debug\net8.0\VortexFlow.Domain.deps.json
+X:\projects\VortexFlow\src\backend-dotnet\VortexFlow.Domain\bin\Debug\net8.0\VortexFlow.Domain.dll
+X:\projects\VortexFlow\src\backend-dotnet\VortexFlow.Domain\bin\Debug\net8.0\VortexFlow.Domain.pdb
+X:\projects\VortexFlow\src\backend-dotnet\VortexFlow.Domain\obj\Debug\net8.0\VortexFlow.Domain.csproj.AssemblyReference.cache
+X:\projects\VortexFlow\src\backend-dotnet\VortexFlow.Domain\obj\Debug\net8.0\VortexFlow.Domain.GeneratedMSBuildEditorConfig.editorconfig
+X:\projects\VortexFlow\src\backend-dotnet\VortexFlow.Domain\obj\Debug\net8.0\VortexFlow.Domain.AssemblyInfoInputs.cache
+X:\projects\VortexFlow\src\backend-dotnet\VortexFlow.Domain\obj\Debug\net8.0\VortexFlow.Domain.AssemblyInfo.cs
+X:\projects\VortexFlow\src\backend-dotnet\VortexFlow.Domain\obj\Debug\net8.0\VortexFlow.Domain.csproj.CoreCompileInputs.cache
+X:\projects\VortexFlow\src\backend-dotnet\VortexFlow.Domain\obj\Debug\net8.0\VortexFlow.Domain.dll
+X:\projects\VortexFlow\src\backend-dotnet\VortexFlow.Domain\obj\Debug\net8.0\refint\VortexFlow.Domain.dll
+X:\projects\VortexFlow\src\backend-dotnet\VortexFlow.Domain\obj\Debug\net8.0\VortexFlow.Domain.pdb
+X:\projects\VortexFlow\src\backend-dotnet\VortexFlow.Domain\obj\Debug\net8.0\ref\VortexFlow.Domain.dll
