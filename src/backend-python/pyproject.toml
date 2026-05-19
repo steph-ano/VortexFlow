@@ -3,6 +3,7 @@ name = "backend-python"
 version = "0.1.0"
 description = "VortexFlow Tactical Specialist API"
 authors = ["Admin <admin@vortexflow.local>"]
+package-mode = false
 
 [tool.poetry.dependencies]
 python = "^3.11"
