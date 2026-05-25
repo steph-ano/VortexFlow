@@ -1,6 +1,6 @@
 # VortexFlow
 
-VortexFlow (anteriormente conocido como NexusTrend) es una plataforma avanzada de analítica de tendencias y automatización de contenido corporativo. Está diseñada para capturar, procesar y presentar insights de mercado en tiempo real mediante una arquitectura de microservicios robusta y escalable.
+VortexFlow es una plataforma avanzada de analítica de tendencias y automatización de contenido corporativo. Está diseñada para capturar, procesar y presentar insights de mercado en tiempo real mediante una arquitectura de microservicios robusta y escalable.
 
 ## Tecnologías Principales
 
