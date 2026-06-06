@@ -1,56 +1,103 @@
 import { defineStore } from 'pinia';
-import api from '../services/api';
+import { markRaw, type Ref, shallowRef } from 'vue';
 import * as signalR from '@microsoft/signalr';
+import { apiClient } from '../services/api';
+import { useAuthStore } from './auth';
+import type { Trend } from '../types';
+
+interface TrendsState {
+  trends: Trend[];
+  loading: boolean;
+  error: string | null;
+  // The SignalR connection holds non-serializable internals; using shallowRef
+  // keeps it out of the reactive proxy and prevents accidental observation.
+  // markRaw makes the object non-reactive. Both are belt-and-suspenders.
+  connection: signalR.HubConnection | null;
+  connectionState: signalR.HubConnectionState | 'idle';
+}
 
 export const useTrendsStore = defineStore('trends', {
-  state: () => ({
-    trends: [] as any[],
-    connection: null as signalR.HubConnection | null,
-    loading: false
+  state: (): TrendsState => ({
+    trends: [],
+    loading: false,
+    error: null,
+    connection: null,
+    connectionState: 'idle',
   }),
   actions: {
     async fetchCurrentTrends() {
       this.loading = true;
+      this.error = null;
       try {
-        const response = await api.get('/api/trends/current');
-        this.trends = response.data.trends || [];
-      } catch (error) {
-        console.error('Error fetching trends:', error);
+        const { data } = await apiClient.trends.current();
+        this.trends = data.trends ?? [];
+      } catch (err: any) {
+        this.error = err?.detail ?? 'Failed to fetch trends';
+        // Don't throw — the dashboard can still show cached state.
       } finally {
         this.loading = false;
       }
     },
-    
-    initSignalR() {
+
+    async initSignalR() {
       if (this.connection) return;
-      
-      const baseUrl = import.meta.env.VITE_API_BASE_URL || 'http://localhost:5000';
-      
-      this.connection = new signalR.HubConnectionBuilder()
-        .withUrl(`${baseUrl}/trendshub`)
-        .withAutomaticReconnect()
-        .build();
-        
-      this.connection.on('TrendsUpdated', (event: any) => {
-        const index = this.trends.findIndex(t => t.eventId === event.eventId);
-        if (index > -1) {
-          this.trends[index] = event;
+
+      const auth = useAuthStore();
+      const baseUrl = (import.meta.env.VITE_API_BASE_URL ?? '/api').replace(/\/api\/?$/, '');
+
+      this.connection = markRaw(
+        new signalR.HubConnectionBuilder()
+          .withUrl(`${baseUrl}/trendshub`, {
+            // Send the current access token on the WebSocket query string.
+            // The .NET SignalR JWT bearer handler reads it from the access_token
+            // token by default.
+            accessTokenFactory: () => auth.accessToken ?? '',
+          })
+          .withAutomaticReconnect([0, 2_000, 10_000, 30_000])
+          .configureLogging(signalR.LogLevel.Warning)
+          .build(),
+      );
+
+      const conn = this.connection;
+      conn.on('TrendsUpdated', (event: Trend) => {
+        const idx = this.trends.findIndex((t) => t.eventId === event.eventId);
+        if (idx >= 0) {
+          this.trends[idx] = event;
         } else {
           this.trends.unshift(event);
-          if (this.trends.length > 50) this.trends.pop();
+          if (this.trends.length > 50) this.trends.length = 50;
         }
       });
-      
-      this.connection.start()
-        .then(() => console.log('SignalR connected'))
-        .catch(err => console.error('Error starting SignalR:', err));
-    },
-    
-    stopSignalR() {
-      if (this.connection) {
-        this.connection.stop();
-        this.connection = null;
+
+      conn.onreconnecting(() => {
+        this.connectionState = signalR.HubConnectionState.Reconnecting;
+      });
+      conn.onreconnected(() => {
+        this.connectionState = signalR.HubConnectionState.Connected;
+      });
+      conn.onclose(() => {
+        this.connectionState = signalR.HubConnectionState.Disconnected;
+      });
+
+      try {
+        await conn.start();
+        this.connectionState = signalR.HubConnectionState.Connected;
+      } catch (err: any) {
+        this.connectionState = signalR.HubConnectionState.Disconnected;
+        this.error = `Realtime updates unavailable: ${err?.message ?? 'unknown error'}`;
       }
-    }
-  }
+    },
+
+    async stopSignalR() {
+      if (this.connection) {
+        try {
+          await this.connection.stop();
+        } catch {
+          // ignore
+        }
+        this.connection = null;
+        this.connectionState = 'idle';
+      }
+    },
+  },
 });

@@ -1,20 +1,27 @@
 version: '3.8'
 
+# ---------------------------------------------------------------------------
+# VortexFlow - BETA stack (uses prebuilt GHCR images).
+# No real secret is hardcoded: every credential comes from the project-root
+# ".env" file (gitignored). Copy .env.example -> .env and fill the values
+# before running `docker compose -f docker-compose.beta.yml up -d`.
+# ---------------------------------------------------------------------------
+
 services:
   # Infrastructure
   postgres:
     image: timescale/timescaledb:latest-pg16
     container_name: vortexflow-postgres-beta
     environment:
-      POSTGRES_USER: vortexflow
-      POSTGRES_PASSWORD: VortexFlow2024!
-      POSTGRES_DB: vortexflow
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_DB: ${POSTGRES_DB}
     ports:
       - "5432:5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U vortexflow"]
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER}"]
       interval: 10s
       timeout: 5s
       retries: 5
@@ -22,12 +29,13 @@ services:
   redis:
     image: redis:7-alpine
     container_name: vortexflow-redis-beta
+    command: ["redis-server", "--requirepass", "${REDIS_PASSWORD}"]
     ports:
       - "6379:6379"
     volumes:
       - redis_data:/data
     healthcheck:
-      test: ["CMD", "redis-cli", "ping"]
+      test: ["CMD", "redis-cli", "-a", "${REDIS_PASSWORD}", "ping"]
       interval: 10s
       timeout: 5s
       retries: 5
@@ -36,8 +44,8 @@ services:
     image: rabbitmq:3.13-management-alpine
     container_name: vortexflow-rabbitmq-beta
     environment:
-      RABBITMQ_DEFAULT_USER: vortexflow
-      RABBITMQ_DEFAULT_PASS: VortexFlow2024!
+      RABBITMQ_DEFAULT_USER: ${RABBITMQ_USER}
+      RABBITMQ_DEFAULT_PASS: ${RABBITMQ_PASSWORD}
     ports:
       - "5672:5672"
       - "15672:15672"
@@ -56,14 +64,16 @@ services:
     environment:
       ASPNETCORE_ENVIRONMENT: Development
       ASPNETCORE_URLS: http://+:8080
-      ConnectionStrings__DefaultConnection: "Host=postgres;Port=5432;Database=vortexflow;Username=vortexflow;Password=VortexFlow2024!"
-      Redis__ConnectionString: "redis:6379"
-      RabbitMQ__Host: "rabbitmq"
-      RabbitMQ__Username: "vortexflow"
-      RabbitMQ__Password: "VortexFlow2024!"
-      JWT__Key: "VortexFlowSuperSecretKey2024ForJWTAuthentication!"
-      JWT__Issuer: "VortexFlow"
-      JWT__Audience: "VortexFlowAPI"
+      ConnectionStrings__Postgres: "Host=postgres;Port=5432;Database=${POSTGRES_DB};Username=${POSTGRES_USER};Password=${POSTGRES_PASSWORD}"
+      ConnectionStrings__Redis: "redis:6379,password=${REDIS_PASSWORD}"
+      ConnectionStrings__RabbitMq: "amqp://${RABBITMQ_USER}:${RABBITMQ_PASSWORD}@rabbitmq:5672/"
+      Jwt__Secret: ${JWT_SECRET}
+      Jwt__ValidIssuer: ${JWT_ISSUER:-VortexFlowApi}
+      Jwt__ValidAudience: ${JWT_AUDIENCE:-VortexFlowClient}
+      ApiKeys__Internal: ${API_KEY_INTERNAL}
+      Bootstrap__SeedAdmin: ${BOOTSTRAP_SEED_ADMIN:-false}
+      Bootstrap__AdminEmail: ${BOOTSTRAP_ADMIN_EMAIL:-}
+      Bootstrap__AdminPassword: ${BOOTSTRAP_ADMIN_PASSWORD:-}
     ports:
       - "5032:8080"
     depends_on:
@@ -79,11 +89,11 @@ services:
     image: ghcr.io/steph-ano/vortexflow/vortexflow-worker:latest
     container_name: vortexflow-worker-beta
     environment:
-      REDIS_URL: "redis://redis:6379"
-      RABBITMQ_URL: "amqp://vortexflow:VortexFlow2024!@rabbitmq:5672"
+      REDIS_URL: "redis://:${REDIS_PASSWORD}@redis:6379/0"
+      RABBITMQ_URL: "amqp://${RABBITMQ_USER}:${RABBITMQ_PASSWORD}@rabbitmq:5672/"
       DOTNET_INGEST_URL: "http://api:8080/api/ingest"
-      API_KEY_INTERNAL: "InternalAPIKey2024!VortexFlow"
-      OTLP_ENDPOINT: "http://otel-collector:4317"
+      API_KEY_INTERNAL: ${API_KEY_INTERNAL}
+      OTLP_ENDPOINT: ${OTLP_ENDPOINT:-http://otel-collector:4317}
       HOSTNAME: "vortexflow-worker-beta"
     depends_on:
       - redis
@@ -94,8 +104,8 @@ services:
     image: ghcr.io/steph-ano/vortexflow/vortexflow-frontend:latest
     container_name: vortexflow-frontend-beta
     environment:
-      VITE_API_URL: "http://localhost:5032"
-      VITE_WS_URL: "http://localhost:5032/hub"
+      VITE_API_URL: ${VITE_API_URL:-http://localhost:5032}
+      VITE_WS_URL: ${VITE_WS_URL:-http://localhost:5032/hub}
     ports:
       - "5173:80"
     depends_on:
@@ -129,8 +139,8 @@ services:
     image: grafana/grafana:10.4.3
     container_name: vortexflow-grafana-beta
     environment:
-      GF_SECURITY_ADMIN_USER: admin
-      GF_SECURITY_ADMIN_PASSWORD: admin
+      GF_SECURITY_ADMIN_USER: ${GRAFANA_ADMIN_USER}
+      GF_SECURITY_ADMIN_PASSWORD: ${GRAFANA_ADMIN_PASSWORD}
     volumes:
       - ./grafana/provisioning:/etc/grafana/provisioning
       - ./grafana/dashboards:/var/lib/grafana/dashboards

@@ -1,6 +1,6 @@
 describe('Posts Management', () => {
   beforeEach(() => {
-    cy.login('admin@vortexflow.local', 'Admin123!')
+    cy.loginAsAdmin()
     cy.visit('/posts')
   })
 

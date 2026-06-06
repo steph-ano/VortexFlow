@@ -1,8 +1,8 @@
 <Project Sdk="Microsoft.NET.Sdk">
 
   <ItemGroup>
-    <ProjectReference Include="..\VortexFlow.Application\VortexFlow.Application.csproj" />
     <ProjectReference Include="..\VortexFlow.Domain\VortexFlow.Domain.csproj" />
+    <ProjectReference Include="..\VortexFlow.Application\VortexFlow.Application.csproj" />
   </ItemGroup>
 
   <ItemGroup>

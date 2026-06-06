@@ -24,10 +24,27 @@ public class VortexFlowDbContext : IdentityDbContext<User>, IApplicationDbContex
             // Configure Metrics column as JSONB
             entity.Property(e => e.Metrics)
                   .HasColumnType("jsonb");
-            
+
             // gin index natively supported
             entity.HasIndex(e => e.Metrics)
                   .HasMethod("gin");
+
+            // Composite (Platform, CapturedAt) index for the time-series query path
+            entity.HasIndex(e => new { e.Platform, e.CapturedAt });
+        });
+
+        // Tenant column is reserved for future multi-tenant enforcement (ADR-0002).
+        // Ownership is enforced at the service layer (CampaignService) to keep the
+        // global query filter simple and explicit per call.
+        builder.Entity<Campaign>(b =>
+        {
+            b.HasIndex(c => c.OwnerId);
+            b.Property(c => c.TenantId).HasMaxLength(64);
+        });
+        builder.Entity<ScheduledPost>(b =>
+        {
+            b.HasIndex(p => p.CampaignId);
+            b.Property(p => p.TenantId).HasMaxLength(64);
         });
     }
 }

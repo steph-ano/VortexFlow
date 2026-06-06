@@ -14,9 +14,13 @@ public class JobScheduler : IJobScheduler
 
     public string SchedulePublishPostJob(Guid postId, DateTime scheduledDate)
     {
-        // Encola el trabajo
-        var offset = new DateTimeOffset(scheduledDate);
-        // Note: we will need to reference PostPublisherJob, it's in Infrastructure, but we can call it 
+        var offset = new DateTimeOffset(DateTime.SpecifyKind(scheduledDate, DateTimeKind.Utc));
         return _backgroundJobClient.Schedule<BackgroundJobs.PostPublisherJob>(job => job.PublishAsync(postId), offset);
+    }
+
+    public bool CancelJob(string jobId)
+    {
+        if (string.IsNullOrWhiteSpace(jobId)) return false;
+        return _backgroundJobClient.Delete(jobId);
     }
 }

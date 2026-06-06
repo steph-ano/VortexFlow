@@ -6,7 +6,7 @@ Este documento lista los flujos críticos que deben verificarse manualmente ante
 
 | # | Test Case | Pasos | Resultado Esperado | Prioridad |
 |---|-----------|-------|-------------------|-----------|
-| 1.1 | Login exitoso | Ingresar admin@vortexflow.local / Admin123! | Redirección al dashboard | Alta |
+| 1.1 | Login exitoso | Ingresar el email y la contraseña configurados en `BOOTSTRAP_ADMIN_EMAIL` / `BOOTSTRAP_ADMIN_PASSWORD` (ver `.env`) | Redirección al dashboard | Alta |
 | 1.2 | Login fallido | Credenciales incorrectas | Mensaje de error visible | Alta |
 | 1.3 | Sesión expirada | Esperar expiration token | Redirect a login | Alta |
 | 1.4 | Logout | Click en logout | Redirect a login | Media |

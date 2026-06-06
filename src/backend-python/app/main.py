@@ -1,3 +1,12 @@
+"""FastAPI service exposing health, manual scrape trigger, and trend read.
+
+Internal endpoints (those prefixed with /internal) require the static API key;
+external endpoints do not. The /trends/current endpoint is the only consumer
+of the Redis cache and is the only place that reads the snapshot store from
+the worker side.
+"""
+from __future__ import annotations
+
 import json
 import time as time_module
 from contextlib import asynccontextmanager
@@ -20,40 +29,40 @@ from app.tasks.scraping import scrape_all_platforms
 
 logger = structlog.get_logger()
 
-otlp_endpoint = settings.OTLP_ENDPOINT if hasattr(settings, 'OTLP_ENDPOINT') else "http://localhost:4317"
-
 resource = Resource.create(attributes={
     "service.name": "VortexFlow.Worker",
     "service.version": "1.0.0",
-    "service.instance.id": settings.HOSTNAME if hasattr(settings, 'HOSTNAME') else "unknown"
+    "service.instance.id": settings.HOSTNAME,
 })
 
 provider = TracerProvider(resource=resource)
-processor = BatchSpanProcessor(OTLPSpanExporter(endpoint=otlp_endpoint, insecure=True))
+processor = BatchSpanProcessor(OTLPSpanExporter(endpoint=settings.OTLP_ENDPOINT, insecure=True))
 provider.add_span_processor(processor)
 trace.set_tracer_provider(provider)
 
 request_count = Counter(
     "vortexflow_http_requests_total",
     "Total HTTP requests",
-    ["method", "endpoint", "status"]
+    ["method", "endpoint", "status"],
 )
 request_duration = Histogram(
     "vortexflow_http_request_duration_seconds",
     "HTTP request duration in seconds",
-    ["method", "endpoint"]
+    ["method", "endpoint"],
 )
+
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     HTTPXClientInstrumentor().instrument()
     yield
 
+
 app = FastAPI(
     title="VortexFlow Tactical Specialist API",
     description="API for scraping and processing social media trends.",
     version="1.0.0",
-    lifespan=lifespan
+    lifespan=lifespan,
 )
 
 FastAPIInstrumentor.instrument_app(app)
@@ -61,7 +70,10 @@ FastAPIInstrumentor.instrument_app(app)
 metrics_app = make_asgi_app()
 app.mount("/metrics", metrics_app)
 
+# Internal API key for /internal/* endpoints. Read against the SAME key the
+# .NET ingest endpoint expects, so the worker and the API agree.
 api_key_header = APIKeyHeader(name="X-API-Key", auto_error=False)
+
 
 @app.middleware("http")
 async def metrics_middleware(request, call_next):
@@ -72,40 +84,61 @@ async def metrics_middleware(request, call_next):
     request_duration.labels(method=request.method, endpoint=request.url.path).observe(duration)
     return response
 
-def get_api_key(api_key_header: str = Security(api_key_header)):
-    if api_key_header == settings.API_KEY_INTERNAL:
+
+def get_api_key(api_key_header: str = Security(api_key_header)) -> str:
+    if api_key_header and api_key_header == settings.API_KEY_INTERNAL:
         return api_key_header
     raise HTTPException(status_code=403, detail="Could not validate API KEY")
 
+
 redis_client = Redis.from_url(settings.REDIS_URL)
+
 
 @app.get("/health")
 def health_check():
     health_status = {"status": "ok", "redis": "disconnected", "rabbitmq": "untested"}
-
     try:
         if redis_client.ping():
             health_status["redis"] = "connected"
-    except Exception as e:
-        logger.error(f"Redis health check failed: {e}")
+    except Exception as e:  # noqa: BLE001
+        logger.error("redis_health_check_failed", error=str(e))
         health_status["status"] = "degraded"
-
     return health_status
 
-@app.post("/trigger-scrape")
+
+@app.post("/internal/trigger-scrape")
 def trigger_scrape(api_key: str = Depends(get_api_key)):
-    logger.info("Scraping manual trigger received.")
+    logger.info("manual_scrape_triggered")
     scrape_all_platforms.delay()
     return {"message": "Scraping tasks triggered successfully"}
 
+
 @app.get("/trends/current")
-def get_current_trends():
-    keys = redis_client.keys("trend:current:*")
-    trends = []
+def get_current_trends(limit: int = 50):
+    """Read the current trend snapshot from Redis.
 
-    for key in keys:
-        data = redis_client.get(key)
+    Uses SCAN (non-blocking) instead of KEYS so the worker can serve
+    concurrent reads without stalling the Redis event loop. `limit` caps
+    the number of keys visited, defaulting to 50.
+    """
+    if limit < 1 or limit > 500:
+        limit = 50
+
+    trends: list[dict] = []
+    visited = 0
+    # SCAN with count hint; abort early once we've collected enough.
+    for key in redis_client.scan_iter(match="trend:current:*", count=100):
+        visited += 1
+        if len(trends) >= limit:
+            break
+        try:
+            data = redis_client.get(key)
+        except Exception as exc:  # noqa: BLE001
+            logger.warning("redis_read_failed", key=key, error=str(exc))
+            continue
         if data:
-            trends.append(json.loads(data))
-
-    return {"count": len(trends), "trends": trends}
+            try:
+                trends.append(json.loads(data))
+            except json.JSONDecodeError:
+                logger.warning("invalid_trend_payload", key=key)
+    return {"count": len(trends), "trends": trends, "visited": visited}

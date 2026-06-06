@@ -10,7 +10,7 @@ describe('Login Flow', () => {
   })
 
   it('should login successfully with valid credentials', () => {
-    cy.login('admin@vortexflow.local', 'Admin123!')
+    cy.loginAsAdmin()
     cy.url().should('not.include', '/login')
     cy.get('[class*="dashboard"], [data-testid="dashboard"]').should('be.visible')
   })
@@ -28,7 +28,7 @@ describe('Login Flow', () => {
   })
 
   it('should logout successfully', () => {
-    cy.login('admin@vortexflow.local', 'Admin123!')
+    cy.loginAsAdmin()
     cy.url().should('not.include', '/login')
     cy.getByTestId('user-menu').click()
     cy.getByTestId('logout-button').click()

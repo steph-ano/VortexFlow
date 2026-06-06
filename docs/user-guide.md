@@ -6,11 +6,17 @@ VortexFlow es una plataforma de analítica de tendencias y automatización de co
 
 ### Credenciales por Defecto
 
-| Rol | Email | Contraseña |
-|-----|-------|------------|
-| Administrador | admin@vortexflow.local | Admin123! |
-| Editor | editor@vortexflow.local | Editor123! |
-| Viewer | viewer@vortexflow.local | Viewer123! |
+> **Política de seguridad.** Este repositorio NO publica credenciales.
+> Las cuentas se crean mediante el flujo de bootstrap o por un
+> administrador vía API/CLI. Los valores mostrados a continuación son
+> únicamente EJEMPLOS del formato esperado; las contraseñas reales se
+> generan y se entregan por un canal seguro (gestor de secretos).
+
+| Rol | Email (ejemplo) | Contraseña |
+|-----|-----------------|------------|
+| Administrador | `admin@vortexflow.local` | Definida en `.env` → `BOOTSTRAP_ADMIN_PASSWORD` |
+| Editor | `editor@vortexflow.local` | Rotada por el admin (no persistida) |
+| Viewer | `viewer@vortexflow.local` | Rotada por el admin (no persistida) |
 
 ### Pasos de Acceso
 

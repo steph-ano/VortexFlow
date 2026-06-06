@@ -99,16 +99,32 @@ cypress/
 
 ### Variables de Entorno
 
-Crea un archivo `cypress.env.json` en la raíz del proyecto:
-
-```json
-{
-  "baseUrl": "http://localhost:5173",
-  "apiUrl": "http://localhost:5032",
-  "adminEmail": "admin@vortexflow.local",
-  "adminPassword": "Admin123!"
-}
-```
+> **No commitear credenciales en `cypress.env.json`.** Cypress soporta
+> varias estrategias seguras; la recomendada es leer las credenciales
+> desde variables de entorno del shell / CI:
+>
+> ```bash
+> export CYPRESS_ADMIN_EMAIL="admin@vortexflow.local"
+> export CYPRESS_ADMIN_PASSWORD="$BOOTSTRAP_ADMIN_PASSWORD"
+> npx cypress run
+> ```
+>
+> Si necesitas un `cypress.env.json` local, **agregalo a `.gitignore`**
+> y usa este template (los valores son los nombres de variable, no
+> secretos):
+>
+> ```json
+> {
+>   "baseUrl": "http://localhost:5173",
+>   "apiUrl": "http://localhost:5032",
+>   "adminEmail": "admin@vortexflow.local",
+>   "adminPassword": "$BOOTSTRAP_ADMIN_PASSWORD"
+> }
+> ```
+>
+> Los archivos E2E (`*.cy.ts`) leen las credenciales con
+> `Cypress.env('adminEmail')` / `Cypress.env('adminPassword')`, que a su
+> vez se resuelven desde el entorno del proceso.
 
 ### Configuración de Cypress (cypress.config.ts)
 

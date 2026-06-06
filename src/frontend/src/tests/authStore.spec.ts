@@ -1,51 +1,99 @@
-import { setActivePinia, createPinia } from 'pinia'
-import { describe, it, expect, beforeEach, vi } from 'vitest'
-import { useAuthStore } from '../stores/auth'
-import api from '../services/api'
+import { setActivePinia, createPinia } from 'pinia';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { useAuthStore } from '../stores/auth';
+import { apiClient } from '../services/api';
 
 vi.mock('../services/api', () => ({
-  default: {
-    post: vi.fn(),
-  }
-}))
+  apiClient: {
+    login: vi.fn(),
+    logout: vi.fn(),
+    me: vi.fn(),
+    refresh: vi.fn(),
+  },
+}));
 
-describe('Auth Store', () => {
+describe('Auth store', () => {
   beforeEach(() => {
-    setActivePinia(createPinia())
-    localStorage.clear()
-    vi.clearAllMocks()
-  })
+    setActivePinia(createPinia());
+    vi.clearAllMocks();
+  });
 
-  it('initializes with no token', () => {
-    const store = useAuthStore()
-    expect(store.token).toBeNull()
-    expect(store.isAuthenticated).toBe(false)
-  })
+  afterEach(() => {
+    vi.useRealTimers();
+  });
 
-  it('logs in successfully and sets token', async () => {
-    const store = useAuthStore()
-    const mockToken = 'mock-jwt-token'
-    
-    // @ts-ignore
-    api.post.mockResolvedValueOnce({ data: { token: mockToken } })
-    
-    await store.login({ email: 'test@test.com', password: 'password' })
-    
-    expect(store.token).toBe(mockToken)
-    expect(store.isAuthenticated).toBe(true)
-    expect(store.user.email).toBe('test@test.com')
-    expect(localStorage.getItem('token')).toBe(mockToken)
-  })
+  it('starts in idle state', () => {
+    const store = useAuthStore();
+    expect(store.status).toBe('idle');
+    expect(store.isAuthenticated).toBe(false);
+  });
 
-  it('logs out and clears token', () => {
-    const store = useAuthStore()
-    store.token = 'existing-token'
-    localStorage.setItem('token', 'existing-token')
-    
-    store.logout()
-    
-    expect(store.token).toBeNull()
-    expect(store.isAuthenticated).toBe(false)
-    expect(localStorage.getItem('token')).toBeNull()
-  })
-})
+  it('logs in successfully and caches the user', async () => {
+    const store = useAuthStore();
+    (apiClient.login as any).mockResolvedValueOnce({
+      data: {
+        accessToken: 'jwt-token',
+        expiresAt: '2030-01-01T00:00:00Z',
+        user: { id: 'u1', email: 'a@b.com', name: 'A', roles: ['Viewer'] },
+      },
+    });
+
+    await store.login('a@b.com', 'p4ssw0rdP4ssw0rd');
+
+    expect(store.accessToken).toBe('jwt-token');
+    expect(store.isAuthenticated).toBe(true);
+    expect(store.user?.email).toBe('a@b.com');
+  });
+
+  it('exposes the last error on failure', async () => {
+    const store = useAuthStore();
+    (apiClient.login as any).mockRejectedValueOnce({ detail: 'Invalid credentials.' });
+
+    await expect(store.login('a@b.com', 'p4ssw0rdP4ssw0rd')).rejects.toBeDefined();
+    expect(store.status).toBe('unauthenticated');
+    expect(store.lastError).toBe('Invalid credentials.');
+  });
+
+  it('hydrate() calls refresh + me on boot and authenticates', async () => {
+    const store = useAuthStore();
+    (apiClient.refresh as any).mockResolvedValueOnce({
+      data: { accessToken: 'jwt-token', expiresAt: '2030-01-01T00:00:00Z' },
+    });
+    (apiClient.me as any).mockResolvedValueOnce({
+      data: { id: 'u1', email: 'a@b.com', name: 'A', roles: [] },
+    });
+
+    const ok = await store.hydrate();
+    expect(ok).toBe(true);
+    expect(store.isAuthenticated).toBe(true);
+    expect(apiClient.refresh).toHaveBeenCalledTimes(1);
+    expect(apiClient.me).toHaveBeenCalledTimes(1);
+  });
+
+  it('hydrate() leaves the store unauthenticated on failure', async () => {
+    const store = useAuthStore();
+    (apiClient.refresh as any).mockRejectedValueOnce(new Error('expired'));
+
+    const ok = await store.hydrate();
+    expect(ok).toBe(false);
+    expect(store.isAuthenticated).toBe(false);
+    expect(store.accessToken).toBeNull();
+  });
+
+  it('logout() clears local state regardless of server response', async () => {
+    const store = useAuthStore();
+    (apiClient.refresh as any).mockResolvedValueOnce({
+      data: { accessToken: 'jwt-token', expiresAt: '2030-01-01T00:00:00Z' },
+    });
+    (apiClient.me as any).mockResolvedValueOnce({
+      data: { id: 'u1', email: 'a@b.com', name: 'A', roles: [] },
+    });
+    await store.hydrate();
+    expect(store.isAuthenticated).toBe(true);
+
+    (apiClient.logout as any).mockRejectedValueOnce(new Error('network down'));
+    await store.logout();
+    expect(store.isAuthenticated).toBe(false);
+    expect(store.accessToken).toBeNull();
+  });
+});

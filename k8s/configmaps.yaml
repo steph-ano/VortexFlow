@@ -1,3 +1,11 @@
+# ---------------------------------------------------------------------------
+# VortexFlow - non-sensitive ConfigMaps.
+# This file is SAFE to commit. No password, no API key, no JWT secret.
+# All sensitive values are sourced from `vortexflow-secrets` (see
+# k8s/secrets.yaml, populated via External Secrets Operator / Sealed
+# Secrets / SOPS in real environments).
+# ---------------------------------------------------------------------------
+---
 apiVersion: v1
 kind: ConfigMap
 metadata:
@@ -8,10 +16,15 @@ data:
   ASPNETCORE_URLS: "http://+:8080"
   Jwt__ValidAudience: "VortexFlowClient"
   Jwt__ValidIssuer: "VortexFlowApi"
-  ConnectionStrings__Postgres: "Host=postgres;Port=5432;Database=vortexflow_db;Username=vortexflow_user;Password=vortexflow_pass"
-  ConnectionStrings__Redis: "redis:6379"
-  ConnectionStrings__RabbitMq: "amqp://guest:guest@rabbitmq:5672/"
   Otlp__Endpoint: "http://otel-collector:4317"
+  # In production we never auto-seed an admin. The operator must bootstrap
+  # the first admin out-of-band (CLI, init job, etc.).
+  Bootstrap__SeedAdmin: "false"
+  Bootstrap__AdminEmail: ""
+  Bootstrap__AdminPassword: ""
+  # ConnectionStrings__Postgres / __Redis / __RabbitMq are intentionally
+  # OMITTED from this ConfigMap. They live in `vortexflow-secrets` and are
+  # injected into the pod via `secretRef` in services.yaml.
 ---
 apiVersion: v1
 kind: ConfigMap
@@ -19,12 +32,14 @@ metadata:
   name: vortexflow-worker-config
   namespace: vortexflow
 data:
-  DATABASE_URL: "postgresql://vortexflow_user:vortexflow_pass@postgres:5432/vortexflow_db"
-  REDIS_URL: "redis://redis:6379/0"
-  RABBITMQ_URL: "amqp://guest:guest@rabbitmq:5672//"
+  # Worker has no business holding connection strings with credentials in
+  # the ConfigMap. Only non-sensitive knobs are exposed here.
   DOTNET_INGEST_URL: "http://vortexflow-api:8080/api/trends/ingest"
-  API_KEY_INTERNAL: "VORTEX_INTERNAL_DEV_KEY_999"
   OTLP_ENDPOINT: "http://otel-collector:4317"
+  SCRAPING_INTERVAL_MINUTES: "5"
+  HOSTNAME: "vortexflow-worker"
+  # DATABASE_URL / REDIS_URL / RABBITMQ_URL / API_KEY_INTERNAL are injected
+  # from `vortexflow-secrets` via `secretRef` in services.yaml.
 ---
 apiVersion: v1
 kind: ConfigMap

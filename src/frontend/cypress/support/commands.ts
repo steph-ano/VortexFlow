@@ -3,6 +3,7 @@
 declare namespace Cypress {
   interface Chainable {
     login(email: string, password: string): Chainable<void>
+    loginAsAdmin(): Chainable<void>
     logout(): Chainable<void>
     getByTestId(testId: string): Chainable<JQuery<HTMLElement>>
     assertRoute(path: string): Chainable<void>
@@ -16,6 +17,23 @@ Cypress.Commands.add('login', (email: string, password: string) => {
   cy.get('input[type="password"], input[name="password"], input[id="password"]').first().clear().type(password)
   cy.get('button[type="submit"], button:contains("Iniciar"), button:contains("Login"), button:contains("Entrar")').first().click()
   cy.url().should('not.include', '/login')
+})
+
+// Login as the bootstrap admin. Credentials MUST be supplied through
+// Cypress env vars (e.g. CYPRESS_ADMIN_EMAIL / CYPRESS_ADMIN_PASSWORD),
+// typically exported from the CI/CD secret store or a local .env that is
+// gitignored. This command fails loudly if the vars are missing so we
+// never silently fall back to a hardcoded default.
+Cypress.Commands.add('loginAsAdmin', () => {
+  const email = Cypress.env('CYPRESS_ADMIN_EMAIL') as string | undefined
+  const password = Cypress.env('CYPRESS_ADMIN_PASSWORD') as string | undefined
+  if (!email || !password) {
+    throw new Error(
+      'loginAsAdmin: missing CYPRESS_ADMIN_EMAIL / CYPRESS_ADMIN_PASSWORD env vars. ' +
+      'Export them from your secret store or a local .env before running Cypress.',
+    )
+  }
+  cy.login(email, password)
 })
 
 Cypress.Commands.add('logout', () => {

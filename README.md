@@ -119,9 +119,19 @@ cd src/frontend && npm run dev
 
 ### Credenciales por Defecto
 
-| Rol | Email | Contraseña |
-|-----|-------|------------|
-| Administrador | admin@vortexflow.local | Admin123! |
+> **IMPORTANTE — Política de seguridad.** Este repositorio NO contiene
+> credenciales por defecto. Las contraseñas del usuario administrador
+> inicial se generan en tiempo de bootstrap y se entregan al operador por
+> un canal seguro (1Password / Vault / secret manager), o se inyectan vía
+> `BOOTSTRAP_ADMIN_PASSWORD` y `BOOTSTRAP_ADMIN_EMAIL` desde el archivo
+> `.env` (gitignored) en la raíz del proyecto.
+>
+> La API de .NET rechaza arrancar (`InvalidOperationException`) si
+> `Bootstrap:SeedAdmin=true` y `Bootstrap:AdminPassword` está vacío.
+
+| Rol | Email (ejemplo) | Contraseña |
+|-----|-----------------|------------|
+| Administrador | `admin@vortexflow.local` | Definida en `.env` (`BOOTSTRAP_ADMIN_PASSWORD`) |
 
 ### Servicios Disponibles
 

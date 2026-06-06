@@ -14,7 +14,6 @@ public class AdminController : ControllerBase
     {
         var monitoringApi = JobStorage.Current.GetMonitoringApi();
         var failedJobs = monitoringApi.FailedJobs(0, 100);
-        
         var result = failedJobs.Select(j => new
         {
             JobId = j.Key,
@@ -22,9 +21,18 @@ public class AdminController : ControllerBase
             Method = j.Value.Job.Method.Name,
             FailedAt = j.Value.FailedAt,
             ExceptionType = j.Value.ExceptionType,
-            ExceptionMessage = j.Value.ExceptionMessage
+            ExceptionMessage = j.Value.ExceptionMessage,
         });
-        
         return Ok(result);
+    }
+
+    [HttpPost("jobs/{jobId}/retry")]
+    public IActionResult RetryJob(string jobId)
+    {
+        var requeued = JobStorage.Current.GetConnection().CreateWriteTransaction();
+        // Hangfire's transactional retry is not universally available; safer is to
+        // re-enqueue. We keep the call idempotent at the dashboard level.
+        BackgroundJob.Requeue(jobId);
+        return Accepted(new { requeued = true, jobId });
     }
 }

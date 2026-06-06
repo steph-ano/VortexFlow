@@ -15,6 +15,10 @@ venv/
 .env.secrets
 celerybeat-schedule*
 
+# Cypress / E2E - never commit local credentials
+cypress.env.json
+cypress/.env
+
 # Node
 node_modules/
 dist/

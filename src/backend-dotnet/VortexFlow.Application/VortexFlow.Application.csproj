@@ -8,6 +8,27 @@
     <PackageReference Include="Microsoft.EntityFrameworkCore" Version="8.0.0" />
   </ItemGroup>
 
+  <ItemGroup>
+    <!--
+      ITokenService exposes SymmetricSecurityKey so the JWT bearer pipeline
+      in VortexFlow.Api can share the signing key with the token issuer. The
+      contract is otherwise framework-agnostic; this single dependency is the
+      minimum needed to type the key.
+    -->
+    <PackageReference Include="Microsoft.IdentityModel.Tokens" Version="7.1.2" />
+    <PackageReference Include="System.IdentityModel.Tokens.Jwt" Version="7.1.2" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <!--
+      Required for IHttpContextAccessor, used by CampaignService to attach the
+      caller's source IP to security audit events. The Application layer is
+      otherwise framework-agnostic; this is the single ASP.NET Core surface it
+      depends on.
+    -->
+    <FrameworkReference Include="Microsoft.AspNetCore.App" />
+  </ItemGroup>
+
   <PropertyGroup>
     <TargetFramework>net8.0</TargetFramework>
     <ImplicitUsings>enable</ImplicitUsings>
