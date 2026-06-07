@@ -1,5 +1,26 @@
 name: VortexFlow CI/CD
 
+# ---------------------------------------------------------------------------
+# POLICY: NO ERROR MASKING
+# ---------------------------------------------------------------------------
+# Steps that perform testing, package auditing, and security validation MUST
+# NOT use `|| true` (or any other failure-suppression construct such as
+# `set +e`, swallow-and-continue, or `continue-on-error: true`). The
+# pipeline's job is to be a strict gate: any failure at HIGH/CRITICAL
+# severity must fail the build and block the deployment.
+#
+# Severity gates by tool:
+#   * npm audit          -> --audit-level=high (HIGH + CRITICAL)
+#   * pip-audit          -> default exit code (any known CVE) + --strict
+#   * dotnet list        -> grep for `>` marker, fail on first match
+#   * Trivy              -> exit-code: 1, severity: CRITICAL,HIGH
+#   * kubectl/kubeconform -> fail on any schema/structural error
+#
+# If a security step ever needs to be temporarily bypassed, the correct
+# path is to disable the step behind a workflow-level input that is
+# reviewed in code, NOT to mask the failure inline.
+# ---------------------------------------------------------------------------
+
 env:
   FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
 
@@ -33,7 +54,20 @@ jobs:
       - name: Restore dependencies
         run: dotnet restore ./src/backend-dotnet/VortexFlow.sln
       - name: Security Audit (NuGet)
-        run: dotnet list ./src/backend-dotnet/VortexFlow.sln package --vulnerable --include-transitive
+        # dotnet list package --vulnerable returns exit code 0 even when
+        # vulnerable packages are present, so we cannot rely on the
+        # command's own exit code. We pipe the table output through
+        # grep for the `>` marker that appears next to a vulnerable
+        # package and fail the job on the first match. `--include-
+        # transitive` makes sure we audit the full closure, not only
+        # the direct dependencies.
+        run: |
+          output=$(dotnet list ./src/backend-dotnet/VortexFlow.sln package --vulnerable --include-transitive)
+          echo "$output"
+          if echo "$output" | grep -E '^[[:space:]]*>[[:space:]]' >/dev/null; then
+            echo "::error title=NuGet vulnerable packages detected::At least one direct or transitive package has a known vulnerability. See the table above."
+            exit 1
+          fi
       - name: Build
         run: dotnet build ./src/backend-dotnet/VortexFlow.sln --no-restore
       - name: Test
@@ -62,9 +96,13 @@ jobs:
         run: poetry install
       - name: Security Audit (Pip-Audit)
         working-directory: ./src/backend-python
+        # pip-audit exits non-zero when ANY known vulnerability is found
+        # in the resolved dependency set. The previous version of this
+        # step did not enforce that explicitly; we now run it in --strict
+        # mode and pipe its exit code through to fail the job.
         run: |
           poetry add --group dev pip-audit
-          poetry run pip-audit
+          poetry run pip-audit --strict
       - name: Lint with ruff
         working-directory: ./src/backend-python
         run: poetry run ruff check .
@@ -89,7 +127,11 @@ jobs:
         run: npm ci
       - name: Security Audit (NPM Audit)
         working-directory: ./src/frontend
-        run: npm audit --audit-level=high || true
+        # --audit-level=high makes `npm audit` exit non-zero on HIGH or
+        # CRITICAL findings. The previous `|| true` masked those failures
+        # and let vulnerable builds ship; it has been removed. Any finding
+        # at the configured level (or worse) now fails the job.
+        run: npm audit --audit-level=high
       - name: Lint
         working-directory: ./src/frontend
         run: npm run lint
@@ -223,10 +265,36 @@ jobs:
           TRIVY_PASSWORD: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Validate Kubernetes manifests
+        # Two layers of validation, both of which must succeed:
+        #   1. kubectl --dry-run=client enforces the manifest is
+        #      well-formed YAML and references known API kinds/fields.
+        #      The previous `|| true` masked the per-file failure and
+        #      let bad manifests ship; it has been removed. The loop
+        #      short-circuits on the first failure.
+        #   2. kubeconform (downloaded below) re-validates against the
+        #      upstream Kubernetes JSON schemas, catching resource
+        #      fields that the local kubectl version may not know
+        #      about. It also catches missing required fields and
+        #      unknown properties.
         run: |
+          set -euo pipefail
           for f in k8s/*.yaml; do
-            echo "Validating $f..."
-            kubectl apply --dry-run=client -f "$f" 2>&1 || true
+            echo "::group::kubectl --dry-run=client $f"
+            kubectl apply --dry-run=client -f "$f"
+            echo "::endgroup::"
+          done
+
+          echo "::group::Installing kubeconform"
+          curl -sSLo /tmp/kubeconform.tar.gz \
+            https://github.com/yannh/kubeconform/releases/latest/download/kubeconform-linux-amd64.tar.gz
+          tar -xzf /tmp/kubeconform.tar.gz -C /tmp
+          install -m 0755 /tmp/kubeconform /usr/local/bin/kubeconform
+          echo "::endgroup::"
+
+          for f in k8s/*.yaml; do
+            echo "::group::kubeconform $f"
+            kubeconform -strict -summary -ignore-missing-schemas "$f"
+            echo "::endgroup::"
           done
 
   # Optional E2E Tests - Run after successful deployment to staging
