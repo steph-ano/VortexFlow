@@ -1,13 +1,12 @@
 using System.Text.Json;
 using MassTransit;
-using Microsoft.EntityFrameworkCore;
+using Microsoft.AspNetCore.SignalR;
 using Microsoft.Extensions.Logging;
 using VortexFlow.Application.Audit;
 using VortexFlow.Application.Cache;
 using VortexFlow.Application.Events;
 using VortexFlow.Application.Interfaces;
 using VortexFlow.Domain.Entities;
-using Microsoft.AspNetCore.SignalR;
 using VortexFlow.Infrastructure.Hubs;
 
 namespace VortexFlow.Infrastructure.Messaging;
@@ -19,20 +18,23 @@ namespace VortexFlow.Infrastructure.Messaging;
 /// </summary>
 public class TrendProcessedConsumer : IConsumer<TrendProcessedEvent>
 {
-    private readonly IApplicationDbContext _context;
+    private readonly ITrendSnapshotRepository _snapshots;
+    private readonly IUnitOfWork _unitOfWork;
     private readonly ITrendCache _cache;
     private readonly IHubContext<TrendsHub> _hubContext;
     private readonly ILogger<TrendProcessedConsumer> _logger;
     private readonly ISecurityAuditLogger _audit;
 
     public TrendProcessedConsumer(
-        IApplicationDbContext context,
+        ITrendSnapshotRepository snapshots,
+        IUnitOfWork unitOfWork,
         ITrendCache cache,
         IHubContext<TrendsHub> hubContext,
         ILogger<TrendProcessedConsumer> logger,
         ISecurityAuditLogger audit)
     {
-        _context = context;
+        _snapshots = snapshots;
+        _unitOfWork = unitOfWork;
         _cache = cache;
         _hubContext = hubContext;
         _logger = logger;
@@ -46,13 +48,12 @@ public class TrendProcessedConsumer : IConsumer<TrendProcessedEvent>
             "Received TrendProcessedEvent {EventId} for platform {Platform}",
             message.EventId, message.Platform);
 
-        // Idempotency: skip if the snapshot already exists. IgnoreQueryFilters
-        // is a forward-compatibility hedge: when (if) a global tenant filter is
-        // added to TrendSnapshot, this consumer must still see cross-tenant
-        // rows because the broker event is the source of truth.
-        var existing = await _context.TrendSnapshots
-            .IgnoreQueryFilters()
-            .FirstOrDefaultAsync(x => x.Id == message.EventId);
+        // Idempotency: skip if the snapshot already exists. When a global
+        // tenant filter is later added to TrendSnapshot, the consumer
+        // must still see cross-tenant rows because the broker event is
+        // the source of truth; the repository's FindByEventIdAsync is
+        // expected to be the seam for that future behavior.
+        var existing = await _snapshots.FindByEventIdAsync(message.EventId, context.CancellationToken);
         if (existing is not null)
         {
             _logger.LogInformation("Snapshot {EventId} already processed; skipping.", message.EventId);
@@ -75,8 +76,8 @@ public class TrendProcessedConsumer : IConsumer<TrendProcessedEvent>
                 }),
         };
 
-        _context.TrendSnapshots.Add(snapshot);
-        await _context.SaveChangesAsync();
+        _snapshots.Add(snapshot);
+        await _unitOfWork.SaveChangesAsync(context.CancellationToken);
 
         // Best-effort cache + signalr. Failures here must not poison the message.
         try

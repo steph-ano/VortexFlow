@@ -1,20 +1,25 @@
 using Microsoft.Extensions.Logging;
+using VortexFlow.Application.Audit;
 using VortexFlow.Application.Interfaces;
 using VortexFlow.Domain.Enums;
-using Microsoft.EntityFrameworkCore;
-using VortexFlow.Application.Audit;
 
 namespace VortexFlow.Infrastructure.BackgroundJobs;
 
 public class PostPublisherJob
 {
-    private readonly IApplicationDbContext _context;
+    private readonly IScheduledPostRepository _posts;
+    private readonly IUnitOfWork _unitOfWork;
     private readonly ILogger<PostPublisherJob> _logger;
     private readonly ISecurityAuditLogger _audit;
 
-    public PostPublisherJob(IApplicationDbContext context, ILogger<PostPublisherJob> logger, ISecurityAuditLogger audit)
+    public PostPublisherJob(
+        IScheduledPostRepository posts,
+        IUnitOfWork unitOfWork,
+        ILogger<PostPublisherJob> logger,
+        ISecurityAuditLogger audit)
     {
-        _context = context;
+        _posts = posts;
+        _unitOfWork = unitOfWork;
         _logger = logger;
         _audit = audit;
     }
@@ -25,10 +30,10 @@ public class PostPublisherJob
 
         // The job runs as a system process (Hangfire worker) without an
         // authenticated principal, so it sees every row regardless of any
-        // future global query filter. For now, no global filters are defined
-        // on ScheduledPost, so the lookup is a plain primary-key fetch.
-        var post = await _context.ScheduledPosts
-            .FirstOrDefaultAsync(p => p.Id == postId);
+        // future global query filter. For now, no global filters are
+        // defined on ScheduledPost, so the lookup is a plain primary-key
+        // fetch via the repository.
+        var post = await _posts.GetByIdAsync(postId);
 
         if (post == null)
         {
@@ -61,6 +66,6 @@ public class PostPublisherJob
             throw;
         }
 
-        await _context.SaveChangesAsync();
+        await _unitOfWork.SaveChangesAsync();
     }
 }

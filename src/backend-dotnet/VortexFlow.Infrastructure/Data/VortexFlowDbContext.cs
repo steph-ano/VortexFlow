@@ -5,15 +5,23 @@ using VortexFlow.Domain.Entities;
 
 namespace VortexFlow.Infrastructure.Data;
 
-public class VortexFlowDbContext : IdentityDbContext<User>, IApplicationDbContext
+/// <summary>
+/// The single EF Core context. The Application layer does NOT depend on
+/// this type; it depends on <see cref="IUnitOfWork"/> (for commits) and
+/// the per-aggregate repositories (for queries). The DbSet properties
+/// stay <c>internal</c>-equivalent (only the repositories in this
+/// project can see them) so the leak surface is bounded to the
+/// Infrastructure assembly.
+/// </summary>
+public class VortexFlowDbContext : IdentityDbContext<User>, IUnitOfWork
 {
     public VortexFlowDbContext(DbContextOptions<VortexFlowDbContext> options) : base(options)
     {
     }
 
-    public DbSet<Campaign> Campaigns => Set<Campaign>();
-    public DbSet<ScheduledPost> ScheduledPosts => Set<ScheduledPost>();
-    public DbSet<TrendSnapshot> TrendSnapshots => Set<TrendSnapshot>();
+    internal DbSet<Campaign> Campaigns => Set<Campaign>();
+    internal DbSet<ScheduledPost> ScheduledPosts => Set<ScheduledPost>();
+    internal DbSet<TrendSnapshot> TrendSnapshots => Set<TrendSnapshot>();
 
     protected override void OnModelCreating(ModelBuilder builder)
     {

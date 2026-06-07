@@ -1,12 +1,11 @@
 using System.Text.Json;
+using MassTransit;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
-using Microsoft.EntityFrameworkCore;
 using VortexFlow.Api.Metrics;
 using VortexFlow.Application.Events;
+using VortexFlow.Application.Interfaces;
 using VortexFlow.Domain.Exceptions;
-using VortexFlow.Infrastructure.Data;
-using MassTransit;
 
 namespace VortexFlow.Api.Controllers;
 
@@ -16,18 +15,18 @@ public class TrendsController : ControllerBase
 {
     private readonly IConfiguration _configuration;
     private readonly IBus _bus;
-    private readonly VortexFlowDbContext _context;
+    private readonly ITrendSnapshotRepository _snapshots;
     private readonly AppMetrics _metrics;
 
     public TrendsController(
         IConfiguration configuration,
         IBus bus,
-        VortexFlowDbContext context,
+        ITrendSnapshotRepository snapshots,
         AppMetrics metrics)
     {
         _configuration = configuration;
         _bus = bus;
-        _context = context;
+        _snapshots = snapshots;
         _metrics = metrics;
     }
 
@@ -65,10 +64,7 @@ public class TrendsController : ControllerBase
     {
         if (limit is < 1 or > 200) limit = 50;
 
-        var snapshots = await _context.TrendSnapshots
-            .OrderByDescending(t => t.CapturedAt)
-            .Take(limit)
-            .ToListAsync(ct);
+        var snapshots = await _snapshots.GetRecentAsync(limit, ct);
 
         var trends = snapshots.Select(t => new
         {

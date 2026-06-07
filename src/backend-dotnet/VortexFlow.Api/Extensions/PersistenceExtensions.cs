@@ -1,5 +1,6 @@
 using Microsoft.EntityFrameworkCore;
 using VortexFlow.Application.Interfaces;
+using VortexFlow.Infrastructure.Cache;
 using VortexFlow.Infrastructure.Data;
 
 namespace VortexFlow.Api.Extensions;
@@ -24,11 +25,16 @@ public static class PersistenceExtensions
         builder.Services.AddDbContext<VortexFlowDbContext>(options =>
             options.UseNpgsql(connStr));
 
-        // Expose the EF context behind the Application-layer abstraction so
-        // services depend on IApplicationDbContext (testable) instead of the
-        // concrete DbContext (couples to EF Core).
-        builder.Services.AddScoped<IApplicationDbContext>(sp =>
+        // The Application layer talks to the database exclusively through
+        // repositories and IUnitOfWork. DbSet<T> on VortexFlowDbContext is
+        // `internal`, which is what forces every consumer to go through the
+        // abstractions registered here.
+        builder.Services.AddScoped<IUnitOfWork>(sp =>
             sp.GetRequiredService<VortexFlowDbContext>());
+
+        builder.Services.AddScoped<ICampaignRepository, CampaignRepository>();
+        builder.Services.AddScoped<IScheduledPostRepository, ScheduledPostRepository>();
+        builder.Services.AddScoped<ITrendSnapshotRepository, TrendSnapshotRepository>();
 
         return builder;
     }
