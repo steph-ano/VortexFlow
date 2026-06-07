@@ -266,30 +266,31 @@ jobs:
 
       - name: Validate Kubernetes manifests
         # Two layers of validation, both of which must succeed:
-        #   1. kubectl --dry-run=client enforces the manifest is
-        #      well-formed YAML and references known API kinds/fields.
-        #      The previous `|| true` masked the per-file failure and
-        #      let bad manifests ship; it has been removed. The loop
-        #      short-circuits on the first failure.
+        #   1. scripts/validate-k8s-manifests.py does a purely client-side
+        #      structural check: well-formed YAML, top-level apiVersion +
+        #      kind, and metadata.name on every non-empty document. The
+        #      previous `kubectl apply --dry-run=client` step was removed
+        #      because kubectl still requires an apiserver connection
+        #      for API group discovery even with `--dry-run=client
+        #      --validate=false`, which fails in CI runners with
+        #      "dial tcp [::1]:8080: connect: connection refused".
         #   2. kubeconform (downloaded below) re-validates against the
         #      upstream Kubernetes JSON schemas, catching resource
-        #      fields that the local kubectl version may not know
-        #      about. It also catches missing required fields and
-        #      unknown properties.
+        #      fields that the structural check cannot see (missing
+        #      spec sub-fields, type mismatches, unknown properties).
+        #      It is strictly more thorough than the old kubectl
+        #      dry-run was, so the gate is not weakened.
         run: |
           set -euo pipefail
-          for f in k8s/*.yaml; do
-            echo "::group::kubectl --dry-run=client $f"
-            # --validate=false is required in CI because kubectl otherwise
-            # tries to download the OpenAPI schema from the apiserver
-            # pointed to by the kubeconfig (default: localhost:8080),
-            # which fails with "connection refused" when no cluster is
-            # available. We only need a structural / parse check here;
-            # schema-level validation against the upstream K8s JSON
-            # schemas is performed by kubeconform immediately after.
-            kubectl apply --dry-run=client --validate=false -f "$f"
-            echo "::endgroup::"
-          done
+
+          # PyYAML is the only runtime dep of the validator. It is not
+          # listed in src/backend-python/pyproject.toml because the
+          # validator is a CI-only tool, not part of the worker image.
+          python3 -m pip install --quiet --disable-pip-version-check pyyaml
+
+          echo "::group::validate-k8s-manifests.py"
+          python3 scripts/validate-k8s-manifests.py k8s/*.yaml
+          echo "::endgroup::"
 
           echo "::group::Installing kubeconform"
           curl -sSLo /tmp/kubeconform.tar.gz \
