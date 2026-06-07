@@ -57,7 +57,7 @@ def test_publish_to_http_fallback_uses_correct_header_and_list_body(sample_event
     """Captures the request built by the HTTP fallback and asserts its shape."""
     captured: dict = {}
 
-    def fake_send(self, request: httpx.Request) -> httpx.Response:
+    def fake_send(self, request: httpx.Request, **kwargs) -> httpx.Response:
         captured["url"] = str(request.url)
         captured["method"] = request.method
         captured["headers"] = dict(request.headers)
@@ -84,7 +84,7 @@ def test_publish_to_http_fallback_uses_correct_header_and_list_body(sample_event
 
 
 def test_publish_to_http_fallback_raises_on_5xx(sample_event, monkeypatch):
-    def fake_send(self, request: httpx.Request) -> httpx.Response:
+    def fake_send(self, request: httpx.Request, **kwargs) -> httpx.Response:
         return httpx.Response(500, request=request, json={"error": "boom"})
 
     monkeypatch.setattr(httpx.Client, "send", fake_send)
