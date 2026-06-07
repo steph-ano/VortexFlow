@@ -23,6 +23,14 @@ FROM mcr.microsoft.com/dotnet/aspnet:8.0-alpine AS final
 WORKDIR /app
 EXPOSE 8080
 
+# Patch OS packages to the latest available in the Alpine repo. The base
+# mcr.microsoft.com/dotnet/aspnet:8.0-alpine layer is frozen in image
+# history; `apk upgrade --no-cache` adds a thin overlay that upgrades
+# installed packages at build time, mirroring the `apt-get upgrade -y`
+# pattern used in python.Dockerfile so transient Trivy findings do not
+# block the CI gate.
+RUN apk upgrade --no-cache
+
 # Usuario no root para seguridad
 RUN adduser -D -u 1000 appuser
 USER appuser
