@@ -21,11 +21,15 @@ def process_and_publish(self, raw_data: dict) -> None:
         trends = AnalyzerService.process(raw_data)
     except Exception as exc:  # noqa: BLE001
         logger.error("analyzer_failed", error=str(exc))
+        # Re-raise so Celery records and retries per the bound task policy.
+        # When max_retries is exceeded, the resulting MaxRetriesExceededError
+        # MUST propagate (do not swallow it with `return`), otherwise Celery
+        # marks the task as SUCCESS even though every attempt failed.
         try:
             raise self.retry(exc=exc, countdown=2 ** self.request.retries)
-        except MaxRetriesExceededError:
-            logger.error("analyzer_exhausted")
-            return
+        except MaxRetriesExceededError as exhausted:
+            logger.error("analyzer_exhausted", error=str(exhausted))
+            raise
 
     for trend in trends:
         trend_dict = trend.model_dump()

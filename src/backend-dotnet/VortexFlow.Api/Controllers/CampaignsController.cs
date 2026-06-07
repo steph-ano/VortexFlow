@@ -5,6 +5,7 @@ using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.RateLimiting;
 using VortexFlow.Api.Metrics;
+using VortexFlow.Api.Validation;
 using VortexFlow.Application.Services;
 using VortexFlow.Application.Tenancy;
 using VortexFlow.Domain.Exceptions;
@@ -154,18 +155,18 @@ public class CampaignsController : ControllerBase
 
 public class ReschedulePostRequest
 {
-    [Required] public DateTime Date { get; set; }
+    [Required, FutureUtcDate] public DateTime Date { get; set; }
 }
 
 public class CreateCampaignRequest
 {
-    [Required, StringLength(120)] public string Name { get; set; } = string.Empty;
+    [Required, StringLength(120, MinimumLength = 1)] public string Name { get; set; } = string.Empty;
     [StringLength(1024)] public string Description { get; set; } = string.Empty;
 }
 
 public class SchedulePostRequest
 {
-    [Required, StringLength(4096)] public string Content { get; set; } = string.Empty;
-    [Required, StringLength(64)] public string Platform { get; set; } = string.Empty;
-    [Required] public DateTime ScheduledDate { get; set; }
+    [Required, StringLength(4096, MinimumLength = 1)] public string Content { get; set; } = string.Empty;
+    [Required, StringLength(64, MinimumLength = 1)] public string Platform { get; set; } = string.Empty;
+    [Required, FutureUtcDate] public DateTime ScheduledDate { get; set; }
 }

@@ -49,10 +49,14 @@ def scrape_platform(self, platform: str):
     except Exception as exc:  # noqa: BLE001
         logger.error("scrape_failed", platform=platform, error=str(exc))
         # Re-raise so Celery records and retries per the bound task policy.
+        # When max_retries is exceeded, the resulting MaxRetriesExceededError
+        # MUST propagate (do not swallow it with `return`/`pass`), otherwise
+        # Celery marks the task as SUCCESS even though every attempt failed.
         try:
             raise self.retry(exc=exc, countdown=2 ** self.request.retries)
-        except MaxRetriesExceededError:
-            logger.error("scrape_exhausted", platform=platform)
+        except MaxRetriesExceededError as exhausted:
+            logger.error("scrape_exhausted", platform=platform, error=str(exhausted))
+            raise
     finally:
         try:
             lock.release()
