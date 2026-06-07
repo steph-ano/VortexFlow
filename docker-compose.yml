@@ -21,7 +21,10 @@ version: '3.8'
 services:
   # Infrastructure
   postgres:
-    image: timescale/timescaledb:2.14.2-pg15
+    image: timescale/timescaledb:2.14.1-pg15
+    # Verified digest (2026-06-07): sha256:25c2b9802a0e7d58071276bd2161ef58a44dc81a65b652faa7b7a69e0c76c667
+    # 2.14.2-pg15 has a broken shared_preload_libraries pointing to timescaledb-2.27.0 (unpackaged)
+    # Pin to digest for production: image: timescale/timescaledb@sha256:25c2b9802a0e7d58071276bd2161ef58a44dc81a65b652faa7b7a69e0c76c667
     container_name: vortexflow-db
     environment:
       POSTGRES_DB: ${POSTGRES_DB:?POSTGRES_DB is required}
@@ -78,11 +81,22 @@ services:
   rabbitmq:
     image: rabbitmq:3.13.7-management-alpine
     container_name: vortexflow-rabbitmq
-    # Same _FILE pattern via a wrapper: read the credentials from files
-    # and export them as the env vars the rabbitmq image expects.
-    environment:
-      RABBITMQ_DEFAULT_USER_FILE: /run/secrets/rabbitmq_user
-      RABBITMQ_DEFAULT_PASS_FILE: /run/secrets/rabbitmq_password
+    # RabbitMQ 3.13 deprecated RABBITMQ_DEFAULT_USER_FILE /
+    # RABBITMQ_DEFAULT_PASS_FILE; setting them now produces a fatal
+    # "deprecated environment variables detected" exit and the
+    # container restart-loops. The replacement is the standard
+    # RABBITMQ_DEFAULT_USER / RABBITMQ_DEFAULT_PASS env vars. We use
+    # a small entrypoint wrapper (docker/rabbitmq-entrypoint.sh) that
+    # reads the secret files and exports the env vars, so the compose
+    # file itself still contains no secret material. The entrypoint
+    # override is given in exec (JSON array) form so the image's
+    # default CMD is forwarded as args; the explicit `command:` is
+    # needed because the docker-compose `entrypoint:` override clears
+    # the inherited image CMD, which would leave the wrapper invoked
+    # with no positional args (the rabbitmq image's docker-entrypoint.sh
+    # uses `set -u` and crashes on "$1: unbound variable").
+    entrypoint: ["/usr/local/bin/rabbitmq-entrypoint.sh"]
+    command: ["rabbitmq-server"]
     secrets:
       - rabbitmq_user
       - rabbitmq_password
@@ -91,6 +105,7 @@ services:
       - "127.0.0.1:15672:15672"   # Management UI — loopback only
     volumes:
       - rabbitmqdata:/var/lib/rabbitmq
+      - ./docker/rabbitmq-entrypoint.sh:/usr/local/bin/rabbitmq-entrypoint.sh:ro
     healthcheck:
       test: ["CMD", "rabbitmq-diagnostics", "-q", "ping"]
       interval: 5s
@@ -117,10 +132,16 @@ services:
     environment:
       ASPNETCORE_ENVIRONMENT: Development
       ASPNETCORE_URLS: http://+:8080
-      # Connection strings: the host/port parts are committed (they are
-      # service names, not secrets). The credential parts are sourced
-      # from the secret mounts so the password never appears as an env
-      # var in `docker inspect`.
+    # Connection strings: the host/port parts are committed (they are
+    # service names, not secrets). The credential parts use a custom
+    # `PasswordFile=` / `passwordFile=` placeholder that the entrypoint
+    # wrapper (docker/dotnet-entrypoint.sh) resolves to the plaintext
+    # password read from the corresponding secret file mount. Npgsql,
+    # StackExchange.Redis and RabbitMQ.Client do not understand this
+    # placeholder natively; the wrapper substitutes the standard
+    # `Password=` / `password=` / `amqp://user:pw@host/` forms at
+    # container start. The compose file itself and the env vars in
+    # the rendered compose remain free of plaintext passwords.
       ConnectionStrings__Postgres: "Host=postgres;Port=5432;Database=${POSTGRES_DB};Username=${POSTGRES_USER};PasswordFile=/run/secrets/postgres_password"
       ConnectionStrings__Redis: "redis:6379,passwordFile=/run/secrets/redis_password"
       ConnectionStrings__RabbitMq: "amqp://${RABBITMQ_USER}:passwordFile=@rabbitmq:5672/"
@@ -130,14 +151,27 @@ services:
       ApiKeys__Internal: ${API_KEY_INTERNAL:?API_KEY_INTERNAL is required}
       Bootstrap__SeedAdmin: ${BOOTSTRAP_SEED_ADMIN:-true}
       Bootstrap__AdminEmail: ${BOOTSTRAP_ADMIN_EMAIL:-admin@vortexflow.local}
-      # Bootstrap admin password is sensitive; consume it from the
-      # secrets file rather than as an env var in the inspect output.
-      Bootstrap__AdminPasswordFile: /run/secrets/admin_password
+      # The .NET StartupConfigurationValidator reads the password from
+      # the Bootstrap__AdminPassword env var, not the *_File convention
+      # used elsewhere in this file. The value comes from the host's
+      # .env (gitignored), so the compose file itself contains no
+      # secret material. It WILL appear in `docker inspect` on this
+      # container; for local dev this is acceptable. The secrets-file
+      # mount for admin_password is kept for symmetry with the other
+      # services and so a future PR adding a *_File-aware validator
+      # path can switch back without touching the secrets block.
+      Bootstrap__AdminPassword: ${BOOTSTRAP_ADMIN_PASSWORD:?BOOTSTRAP_ADMIN_PASSWORD is required}
     secrets:
       - postgres_password
       - redis_password
       - rabbitmq_password
       - admin_password
+    # Custom entrypoint that resolves the `PasswordFile=` /
+    # `passwordFile=` placeholders in the connection strings by
+    # reading the secret files. See docker/dotnet.Dockerfile (the
+    # script is baked into the image, not bind-mounted, to avoid
+    # Docker-Desktop-on-Windows bind-mount flakiness on shell
+    # scripts).
     depends_on:
       postgres:
         condition: service_healthy

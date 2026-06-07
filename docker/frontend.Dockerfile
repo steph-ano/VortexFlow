@@ -34,7 +34,10 @@ RUN touch /var/run/nginx.pid && chown -R nginx:nginx /var/run/nginx.pid
 USER nginx
 
 HEALTHCHECK --interval=30s --timeout=5s --start-period=10s --retries=3 \
-    CMD wget --quiet --tries=1 --spider http://localhost/ || exit 1
+    # Use 127.0.0.1 (IPv4) explicitly: nginx listens on `listen 80;` (IPv4
+    # only), and `localhost` resolves to `::1` (IPv6) first on Alpine,
+    # which would fail the healthcheck even when nginx is up.
+    CMD wget --quiet --tries=1 --spider http://127.0.0.1/ || exit 1
 
 EXPOSE 80
 CMD ["nginx", "-g", "daemon off;"]

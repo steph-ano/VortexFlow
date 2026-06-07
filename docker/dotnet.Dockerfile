@@ -41,4 +41,14 @@ ENV ASPNETCORE_ENVIRONMENT=Production
 
 COPY --from=build /app/publish .
 
-ENTRYPOINT ["dotnet", "VortexFlow.Api.dll"]
+# Custom entrypoint that resolves the `PasswordFile=` / `passwordFile=`
+# placeholders in the connection strings by reading the secret files.
+# Baked into the image (not bind-mounted) so the API container has it
+# even when running on Docker Desktop for Windows where bind mounts of
+# shell scripts sometimes fail with "no such file or directory" at
+# exec time. `--chmod=755` sets the executable bit in the COPY itself
+# because the previous `USER appuser` line above would make a
+# subsequent `RUN chmod +x` fail with "permission denied".
+COPY --chmod=755 docker/dotnet-entrypoint.sh /usr/local/bin/dotnet-entrypoint.sh
+
+ENTRYPOINT ["/usr/local/bin/dotnet-entrypoint.sh"]

@@ -53,9 +53,15 @@ builder.Services.AddSwaggerGen(c =>
     });
 });
 
-builder.Services.AddTransient<CorrelationIdMiddleware>();
-builder.Services.AddTransient<ProblemDetailsExceptionMiddleware>();
-builder.Services.AddTransient<IdempotencyKeyMiddleware>();
+// Middleware classes are activated by the pipeline via app.UseMiddleware<T>(),
+// which uses ActivatorUtilities to inject the in-pipeline `RequestDelegate`.
+// Registering them with AddTransient<...> forces the default service
+// provider to validate a constructor that requires `RequestDelegate`, which
+// is not a registered service and cannot be resolved. The Build() call
+// then throws "Unable to resolve service for type
+// 'Microsoft.AspNetCore.Http.RequestDelegate'".
+// The pipeline activation in the block below is the single, correct
+// registration point for these types.
 
 var app = builder.Build();
 

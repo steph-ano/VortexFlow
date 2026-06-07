@@ -42,7 +42,10 @@ spec:
           # Pinned semver. For maximum immutability, additionally pin
           # the digest after pulling the image:
           #   image: timescale/timescaledb@sha256:<digest>
-          image: timescale/timescaledb:2.14.2-pg15
+          image: timescale/timescaledb:2.14.1-pg15
+          # Verified digest (2026-06-07): sha256:25c2b9802a0e7d58071276bd2161ef58a44dc81a65b652faa7b7a69e0c76c667
+          # 2.14.2-pg15 has a broken shared_preload_libraries pointing to timescaledb-2.27.0 (unpackaged)
+          # Pin to digest: image: timescale/timescaledb@sha256:25c2b9802a0e7d58071276bd2161ef58a44dc81a65b652faa7b7a69e0c76c667
           imagePullPolicy: IfNotPresent
           ports:
             - name: postgres
