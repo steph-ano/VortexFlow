@@ -1,4 +1,5 @@
-import axios, { AxiosError, AxiosInstance, InternalAxiosRequestConfig } from 'axios';
+import axios, { AxiosError } from 'axios';
+import type { AxiosInstance, InternalAxiosRequestConfig } from 'axios';
 import type { ApiError, AuthUser, LoginResponse, TrendListResponse } from '../types';
 import { useAuthStore } from '../stores/auth';
 

@@ -9,19 +9,28 @@ export default defineConfig({
     // Manual chunking keeps the initial bundle small. ECharts and FullCalendar
     // are the two largest third-party dependencies; isolating them into
     // separate chunks lets the browser cache them independently and lets the
-    // routes that don't need them avoid loading them.
+    // routes that don't need them avoid loading them. Vite 8 / Rollup 4 only
+    // accept the function form of `manualChunks`, so we map module ids to
+    // chunk names.
     rollupOptions: {
       output: {
-        manualChunks: {
-          echarts: ['echarts', 'vue-echarts', 'zrender'],
-          fullcalendar: [
-            '@fullcalendar/core',
-            '@fullcalendar/vue3',
-            '@fullcalendar/daygrid',
-            '@fullcalendar/timegrid',
-            '@fullcalendar/interaction',
-          ],
-          signalr: ['@microsoft/signalr'],
+        manualChunks: (id) => {
+          if (id.includes('node_modules')) {
+            if (
+              id.includes('/echarts/') ||
+              id.includes('/vue-echarts/') ||
+              id.includes('/zrender/')
+            ) {
+              return 'echarts';
+            }
+            if (id.includes('/@fullcalendar/')) {
+              return 'fullcalendar';
+            }
+            if (id.includes('/@microsoft/signalr/')) {
+              return 'signalr';
+            }
+          }
+          return undefined;
         },
       },
     },
