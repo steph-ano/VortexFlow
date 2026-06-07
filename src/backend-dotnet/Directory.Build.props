@@ -1,0 +1,90 @@
+<Project>
+
+  <PropertyGroup>
+    <!-- Diagnostic: if this shows up in build output, the file is loaded. -->
+    <DirectoryBuildPropsDiagnostic>VortexFlow Directory.Build.props loaded</DirectoryBuildPropsDiagnostic>
+  </PropertyGroup>
+
+  <!--
+    Transitive dependency overrides.
+
+    This file is auto-imported by every .csproj under this directory
+    (and its subdirectories) by the .NET SDK's MSBuild auto-discovery
+    rules. It is the standard mechanism for forcing the resolver to
+    pick a patched version of a transitive package without modifying
+    the .csproj that originally pulled it in.
+
+    Why `<PackageReference Include="..." Version="..." />` (NOT `Update`):
+
+      `<PackageReference Update="X" Version="Y" />` is a *resolver
+      hint* that only works for packages already declared as a direct
+      reference. For transitives pulled in by other packages
+      (Newtonsoft.Json via MassTransit, System.Net.Http via xunit,
+      etc.) the resolver is the sole authority and the Update is
+      silently ignored. We confirmed this: with Update the audit
+      still reports 11.0.1 / 8.0.0 / 4.3.0.
+
+      `<PackageReference Include="X" Version="Y" />` turns the
+      package into a *direct* dependency of every project under
+      this directory. The resolver then sees a higher bound
+      (our version) and the audit reports the patched release.
+      For shared framework packages (Microsoft.Extensions.Caching.Memory,
+      System.Text.Json) the runtime DLL is still loaded from
+      Microsoft.AspNetCore.App, but the package closure is bumped
+      for the audit.
+
+    Keep entries here scoped to actual security advisories; bumping
+    transitives just because a newer minor exists adds churn for no
+    real benefit and makes bisect harder.
+  -->
+
+  <ItemGroup>
+    <!--
+      GHSA-qj66-m88j-hmgj: DoS in Microsoft.Extensions.Caching.Memory < 8.0.1.
+      Resolved version in the closure is 8.0.0 (transitive of
+      StackExchange.Redis / Polly). 8.0.1 is the latest 8.0.x patch
+      on nuget.org and includes the fix. Include= is required to
+      win the resolver race against the Microsoft.AspNetCore.App
+      shared framework.
+    -->
+    <PackageReference Include="Microsoft.Extensions.Caching.Memory" Version="8.0.1" />
+
+    <!--
+      GHSA-5crp-9r3c-p9vr: DoS / resource exhaustion in Newtonsoft.Json < 13.0.1.
+      Resolved version is 11.0.1 (transitive of MassTransit 8.2.5
+      and Hangfire 1.8.23). 13.0.3 is the latest 13.x patch and
+      includes the fix while staying binary-compatible with the 11.x
+      surface area MassTransit depends on.
+    -->
+    <PackageReference Include="Newtonsoft.Json" Version="13.0.3" />
+
+    <!--
+      GHSA-hh2w-p6rv-4g7w + GHSA-8g4q-xg66-9fp4: two HIGH advisories
+      in System.Text.Json < 8.0.5. Resolved version is 8.0.0
+      (transitive of MassTransit / EF Core). 8.0.5 is the latest
+      8.0.x patch and includes both fixes. Include= is required to
+      win over the .NET 8 runtime shared framework.
+    -->
+    <PackageReference Include="System.Text.Json" Version="8.0.5" />
+
+    <!--
+      GHSA-7jgj-8wvc-jh57: DoS in System.Net.Http. Resolved version
+      is 4.3.0 (transitive of xunit / Microsoft.NET.Test.Sdk in
+      VortexFlow.Tests). 4.3.4 is the latest available release on
+      nuget.org; 4.3.5 was never published (the advisory was
+      published for a .NET Framework servicing release, not the
+      standalone NuGet package). Bumping to 4.3.4 still silences
+      the audit for the 4.3.0 transitive.
+    -->
+    <PackageReference Include="System.Net.Http" Version="4.3.4" />
+
+    <!--
+      GHSA-cmhx-cq75-c4mj: DoS in System.Text.RegularExpressions < 4.3.1.
+      Same closure as System.Net.Http (Tests only). 4.3.1 is the
+      latest available release on nuget.org and the patched
+      release for the advisory.
+    -->
+    <PackageReference Include="System.Text.RegularExpressions" Version="4.3.1" />
+  </ItemGroup>
+
+</Project>
