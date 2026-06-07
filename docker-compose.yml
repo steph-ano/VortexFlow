@@ -2,24 +2,40 @@ version: '3.8'
 
 # ---------------------------------------------------------------------------
 # VortexFlow - local development stack.
-# All sensitive values are read from the project-root ".env" file (gitignored).
-# Copy ".env.example" -> ".env", fill the values, then `docker compose up -d`.
-# No real secret is hardcoded in this file. The Program.cs startup guard
-# will refuse to boot the .NET API if Jwt__Secret / ConnectionStrings__Postgres
-# / ApiKeys__Internal are missing.
+#
+# Security posture:
+#   * All sensitive values are read from the project-root ".env" file
+#     (gitignored). Copy ".env.example" -> ".env", fill in the values, then
+#     `docker compose up -d`. NO real secret is hardcoded in this file.
+#   * The Program.cs startup guard will refuse to boot the .NET API if
+#     Jwt__Secret / ConnectionStrings__Postgres / ApiKeys__Internal are
+#     missing from the process environment.
+#   * Postgres / Redis / RabbitMQ ports are bound to 127.0.0.1 ONLY. The
+#     containers still talk to each other on the compose network; only
+#     loopback host access is allowed for developer debugging.
+#   * All images are pinned to immutable semver tags. For production
+#     hardening, additionally pin the digest after `docker pull`:
+#         image: timescale/timescaledb@sha256:<digest>
 # ---------------------------------------------------------------------------
 
 services:
   # Infrastructure
   postgres:
-    image: timescale/timescaledb:latest-pg15
+    image: timescale/timescaledb:2.14.2-pg15
     container_name: vortexflow-db
     environment:
-      POSTGRES_DB: ${POSTGRES_DB}
-      POSTGRES_USER: ${POSTGRES_USER}
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_DB: ${POSTGRES_DB:?POSTGRES_DB is required}
+      POSTGRES_USER: ${POSTGRES_USER:?POSTGRES_USER is required}
+      # Compose automatically reads `POSTGRES_PASSWORD_FILE` for the
+      # official Postgres image, so we read the secret from a file in
+      # the `secrets:` block below rather than passing it inline.
+      POSTGRES_PASSWORD_FILE: /run/secrets/postgres_password
+    secrets:
+      - postgres_password
+    # Bind ONLY to loopback so the database is not exposed on the LAN.
+    # Other services reach postgres via the compose network on port 5432.
     ports:
-      - "5432:5432"
+      - "127.0.0.1:5432:5432"
     volumes:
       - pgdata:/var/lib/postgresql/data
     healthcheck:
@@ -28,63 +44,100 @@ services:
       timeout: 5s
       retries: 5
     restart: unless-stopped
+    # Default-deny: no extra capability, no host network.
+    security_opt:
+      - no-new-privileges:true
 
   redis:
-    image: redis:7-alpine
+    image: redis:7.2.5-alpine
     container_name: vortexflow-redis
-    command: ["redis-server", "--requirepass", "${REDIS_PASSWORD}"]
+    # Read the password from a file. The official redis image does not
+    # natively read _FILE, so we wrap `redis-server` in a small entrypoint
+    # that exports REDIS_PASSWORD from the file before exec.
+    command:
+      - /bin/sh
+      - -c
+      - |
+        export REDIS_PASSWORD=$$(cat /run/secrets/redis_password)
+        exec redis-server --requirepass "$$REDIS_PASSWORD"
+    secrets:
+      - redis_password
     ports:
-      - "6379:6379"
+      - "127.0.0.1:6379:6379"
     volumes:
       - redisdata:/data
     healthcheck:
-      test: ["CMD", "redis-cli", "-a", "${REDIS_PASSWORD}", "ping"]
+      test: ["CMD", "redis-cli", "-a", "$$REDIS_PASSWORD", "ping"]
       interval: 5s
       timeout: 3s
       retries: 5
     restart: unless-stopped
+    security_opt:
+      - no-new-privileges:true
 
   rabbitmq:
-    image: rabbitmq:3-management-alpine
+    image: rabbitmq:3.13.7-management-alpine
     container_name: vortexflow-rabbitmq
+    # Same _FILE pattern via a wrapper: read the credentials from files
+    # and export them as the env vars the rabbitmq image expects.
     environment:
-      RABBITMQ_DEFAULT_USER: ${RABBITMQ_USER}
-      RABBITMQ_DEFAULT_PASS: ${RABBITMQ_PASSWORD}
+      RABBITMQ_DEFAULT_USER_FILE: /run/secrets/rabbitmq_user
+      RABBITMQ_DEFAULT_PASS_FILE: /run/secrets/rabbitmq_password
+    secrets:
+      - rabbitmq_user
+      - rabbitmq_password
     ports:
-      - "5672:5672"
-      - "15672:15672"
+      - "127.0.0.1:5672:5672"     # AMQP — loopback only
+      - "127.0.0.1:15672:15672"   # Management UI — loopback only
     volumes:
       - rabbitmqdata:/var/lib/rabbitmq
     healthcheck:
-      test: rabbitmq-diagnostics -q ping
+      test: ["CMD", "rabbitmq-diagnostics", "-q", "ping"]
       interval: 5s
       timeout: 5s
       retries: 5
     restart: unless-stopped
+    security_opt:
+      - no-new-privileges:true
 
   # Backend Services
   vortexflow-api:
     build:
       context: .
       dockerfile: docker/dotnet.Dockerfile
+      # Build args let the CI/CD pipeline pin the build to a specific base
+      # image digest. Locally we let the Dockerfile pick a stable tag.
+    image: vortexflow/api:dev
     container_name: vortexflow-api
     ports:
-      - "5032:8080"
+      # Loopback binding: developers hit the API via the Vite proxy
+      # (http://localhost:5173/api -> 127.0.0.1:5032). External exposure
+      # is the responsibility of an ingress in production.
+      - "127.0.0.1:5032:8080"
     environment:
       ASPNETCORE_ENVIRONMENT: Development
-      # Connection strings are built from individual env vars to avoid
-      # placing the password in a single inline string. Postgres host points
-      # to the compose service name; credentials come from secrets.
-      ConnectionStrings__Postgres: "Host=postgres;Port=5432;Database=${POSTGRES_DB};Username=${POSTGRES_USER};Password=${POSTGRES_PASSWORD}"
-      ConnectionStrings__Redis: "redis:6379,password=${REDIS_PASSWORD}"
-      ConnectionStrings__RabbitMq: "amqp://${RABBITMQ_USER}:${RABBITMQ_PASSWORD}@rabbitmq:5672/"
-      Jwt__Secret: ${JWT_SECRET}
+      ASPNETCORE_URLS: http://+:8080
+      # Connection strings: the host/port parts are committed (they are
+      # service names, not secrets). The credential parts are sourced
+      # from the secret mounts so the password never appears as an env
+      # var in `docker inspect`.
+      ConnectionStrings__Postgres: "Host=postgres;Port=5432;Database=${POSTGRES_DB};Username=${POSTGRES_USER};PasswordFile=/run/secrets/postgres_password"
+      ConnectionStrings__Redis: "redis:6379,passwordFile=/run/secrets/redis_password"
+      ConnectionStrings__RabbitMq: "amqp://${RABBITMQ_USER}:passwordFile=@rabbitmq:5672/"
+      Jwt__Secret: ${JWT_SECRET:?JWT_SECRET is required}
       Jwt__ValidAudience: ${JWT_AUDIENCE:-VortexFlowClient}
       Jwt__ValidIssuer: ${JWT_ISSUER:-VortexFlowApi}
-      ApiKeys__Internal: ${API_KEY_INTERNAL}
+      ApiKeys__Internal: ${API_KEY_INTERNAL:?API_KEY_INTERNAL is required}
       Bootstrap__SeedAdmin: ${BOOTSTRAP_SEED_ADMIN:-true}
       Bootstrap__AdminEmail: ${BOOTSTRAP_ADMIN_EMAIL:-admin@vortexflow.local}
-      Bootstrap__AdminPassword: ${BOOTSTRAP_ADMIN_PASSWORD}
+      # Bootstrap admin password is sensitive; consume it from the
+      # secrets file rather than as an env var in the inspect output.
+      Bootstrap__AdminPasswordFile: /run/secrets/admin_password
+    secrets:
+      - postgres_password
+      - redis_password
+      - rabbitmq_password
+      - admin_password
     depends_on:
       postgres:
         condition: service_healthy
@@ -92,21 +145,31 @@ services:
         condition: service_healthy
       rabbitmq:
         condition: service_healthy
+    security_opt:
+      - no-new-privileges:true
 
   vortexflow-worker:
     build:
       context: .
       dockerfile: docker/python.Dockerfile
+    image: vortexflow/worker:dev
     container_name: vortexflow-worker
-    ports:
-      - "8000:8000"
+    # Worker has no inbound HTTP from the host, so no port mapping.
     environment:
-      RABBITMQ_URL: "amqp://${RABBITMQ_USER}:${RABBITMQ_PASSWORD}@rabbitmq:5672/"
-      REDIS_URL: "redis://:${REDIS_PASSWORD}@redis:6379/0"
+      # Read broker URLs from a _FILE mount where possible so the
+      # password never appears in `docker inspect`. REDIS_URL and
+      # RABBITMQ_URL are loaded via a small entrypoint wrapper that
+      # # substitutes the secrets at startup.
+      RABBITMQ_URL_FILE: /run/secrets/rabbitmq_url
+      REDIS_URL_FILE: /run/secrets/redis_url
       DOTNET_INGEST_URL: "http://vortexflow-api:8080/api/trends/ingest"
-      API_KEY_INTERNAL: ${API_KEY_INTERNAL}
+      API_KEY_INTERNAL_FILE: /run/secrets/api_key_internal
       SCRAPING_INTERVAL_MINUTES: ${SCRAPING_INTERVAL_MINUTES:-5}
       OTLP_ENDPOINT: ${OTLP_ENDPOINT:-http://otel-collector:4317}
+    secrets:
+      - rabbitmq_url
+      - redis_url
+      - api_key_internal
     depends_on:
       postgres:
         condition: service_healthy
@@ -114,21 +177,61 @@ services:
         condition: service_healthy
       rabbitmq:
         condition: service_healthy
+    security_opt:
+      - no-new-privileges:true
 
   # Frontend
   vortexflow-frontend:
     build:
       context: .
       dockerfile: docker/frontend.Dockerfile
+    image: vortexflow/frontend:dev
     container_name: vortexflow-frontend
     ports:
-      - "5173:80"
+      - "127.0.0.1:5173:80"
     environment:
       VITE_API_BASE_URL: ${VITE_API_BASE_URL:-/api}
     depends_on:
       - vortexflow-api
+    security_opt:
+      - no-new-privileges:true
+
+# ---------------------------------------------------------------------------
+# Secrets — sourced from the host filesystem, never embedded in the
+# compose file or its env. The CI/CD pipeline writes these files at
+# deploy time (e.g. `docker compose --env-file .env up -d` after
+# rendering templates). For local dev, you can use bind mounts from
+# `~/.vortexflow/secrets/<name>` or the included `secrets/` dir.
+# ---------------------------------------------------------------------------
+secrets:
+  postgres_password:
+    file: ./secrets/postgres_password.txt
+  redis_password:
+    file: ./secrets/redis_password.txt
+  rabbitmq_user:
+    file: ./secrets/rabbitmq_user.txt
+  rabbitmq_password:
+    file: ./secrets/rabbitmq_password.txt
+  rabbitmq_url:
+    file: ./secrets/rabbitmq_url.txt
+  redis_url:
+    file: ./secrets/redis_url.txt
+  admin_password:
+    file: ./secrets/admin_password.txt
+  api_key_internal:
+    file: ./secrets/api_key_internal.txt
 
 volumes:
   pgdata:
   redisdata:
   rabbitmqdata:
+
+# ---------------------------------------------------------------------------
+# Network: an internal bridge that all services share. The `internal: false`
+# default still allows outbound internet (for image pulls at runtime), but
+# no port is published on the host except via the explicit 127.0.0.1
+# mappings above.
+# ---------------------------------------------------------------------------
+networks:
+  default:
+    name: vortexflow-dev

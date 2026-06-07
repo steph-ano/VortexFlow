@@ -1,67 +1,118 @@
 version: '3.8'
 
+# ---------------------------------------------------------------------------
+# VortexFlow - PRODUCTION stack.
+#
+# All images are pinned to immutable semver tags. For maximum hardening,
+# additionally pin to a sha256 digest after `docker pull`:
+#     image: ghcr.io/tu-organizacion/vortexflow-api@sha256:<digest>
+# All sensitive values come from the host filesystem via the `secrets:`
+# block — the compose file itself contains NO plaintext credentials.
+# Internal services (postgres / redis / rabbitmq) have NO host port
+# mapping; only the frontend (port 80) is published for ingress.
+# ---------------------------------------------------------------------------
+
 services:
   postgres:
-    image: timescale/timescaledb:latest-pg15
+    image: timescale/timescaledb:2.14.2-pg15
+    pull_policy: if_not_present
     container_name: vortexflow-db-prod
     environment:
-      POSTGRES_DB: ${POSTGRES_DB}
-      POSTGRES_USER: ${POSTGRES_USER}
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_DB_FILE: /run/secrets/postgres_db
+      POSTGRES_USER_FILE: /run/secrets/postgres_user
+      POSTGRES_PASSWORD_FILE: /run/secrets/postgres_password
+    secrets:
+      - postgres_db
+      - postgres_user
+      - postgres_password
+    # No host port mapping: postgres is reachable only via the
+    # internal vortexflow-network. Operators connect via `docker exec`.
     volumes:
       - pgdata-prod:/var/lib/postgresql/data
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER} -d ${POSTGRES_DB}"]
+      test: ["CMD-SHELL", "pg_isready -U $$(cat /run/secrets/postgres_user) -d $$(cat /run/secrets/postgres_db)"]
       interval: 10s
       timeout: 5s
       retries: 5
     restart: always
     networks:
       - vortexflow-network
+    security_opt:
+      - no-new-privileges:true
 
   redis:
-    image: redis:7-alpine
+    image: redis:7.2.5-alpine
+    pull_policy: if_not_present
     container_name: vortexflow-redis-prod
+    command:
+      - /bin/sh
+      - -c
+      - |
+        export REDIS_PASSWORD=$$(cat /run/secrets/redis_password)
+        exec redis-server --requirepass "$$REDIS_PASSWORD"
+    secrets:
+      - redis_password
     volumes:
       - redisdata-prod:/data
-    command: redis-server --requirepass ${REDIS_PASSWORD}
     healthcheck:
-      test: ["CMD", "redis-cli", "-a", "${REDIS_PASSWORD}", "ping"]
+      test: ["CMD-SHELL", "redis-cli -a \"$$REDIS_PASSWORD\" ping"]
       interval: 10s
       timeout: 5s
       retries: 5
     restart: always
     networks:
       - vortexflow-network
+    security_opt:
+      - no-new-privileges:true
 
   rabbitmq:
-    image: rabbitmq:3-management-alpine
+    image: rabbitmq:3.13.7-management-alpine
+    pull_policy: if_not_present
     container_name: vortexflow-rabbitmq-prod
     environment:
-      RABBITMQ_DEFAULT_USER: ${RABBITMQ_USER}
-      RABBITMQ_DEFAULT_PASS: ${RABBITMQ_PASSWORD}
+      RABBITMQ_DEFAULT_USER_FILE: /run/secrets/rabbitmq_user
+      RABBITMQ_DEFAULT_PASS_FILE: /run/secrets/rabbitmq_password
+    secrets:
+      - rabbitmq_user
+      - rabbitmq_password
+    # Management UI on 15672 is intentionally NOT exposed; use the
+    # operator-side `rabbitmqctl` exec if needed.
     volumes:
       - rabbitmqdata-prod:/var/lib/rabbitmq
     healthcheck:
-      test: rabbitmq-diagnostics -q ping
+      test: ["CMD", "rabbitmq-diagnostics", "-q", "ping"]
       interval: 10s
       timeout: 5s
       retries: 5
     restart: always
     networks:
       - vortexflow-network
+    security_opt:
+      - no-new-privileges:true
 
   vortexflow-api:
-    image: ghcr.io/tu-organizacion/vortexflow-api:latest
+    image: ghcr.io/tu-organizacion/vortexflow-api:1.0.0
+    pull_policy: if_not_present
     container_name: vortexflow-api-prod
     environment:
-      - ConnectionStrings__DefaultConnection=Host=postgres;Port=5432;Database=${POSTGRES_DB};Username=${POSTGRES_USER};Password=${POSTGRES_PASSWORD}
-      - Redis__ConnectionString=redis:6379,password=${REDIS_PASSWORD}
-      - RabbitMQ__Host=rabbitmq
-      - RabbitMQ__Username=${RABBITMQ_USER}
-      - RabbitMQ__Password=${RABBITMQ_PASSWORD}
-      - JwtSettings__Secret=${JWT_SECRET}
-      - ASPNETCORE_ENVIRONMENT=Production
+      ASPNETCORE_ENVIRONMENT: Production
+      ASPNETCORE_URLS: http://+:8080
+      ConnectionStrings__Postgres: "Host=postgres;Port=5432;DatabaseFile=/run/secrets/postgres_db;UsernameFile=/run/secrets/postgres_user;PasswordFile=/run/secrets/postgres_password"
+      ConnectionStrings__Redis: "redis:6379,passwordFile=/run/secrets/redis_password"
+      ConnectionStrings__RabbitMq: "amqp://userFile=@rabbitmq:5672/"
+      Jwt__Secret: ${JWT_SECRET:?JWT_SECRET is required}
+      Jwt__ValidIssuer: ${JWT_ISSUER:-VortexFlowApi}
+      Jwt__ValidAudience: ${JWT_AUDIENCE:-VortexFlowClient}
+      ApiKeys__Internal: ${API_KEY_INTERNAL:?API_KEY_INTERNAL is required}
+      Bootstrap__SeedAdmin: "false"
+      Bootstrap__AdminEmail: ""
+      Bootstrap__AdminPassword: ""
+    secrets:
+      - postgres_db
+      - postgres_user
+      - postgres_password
+      - redis_password
+      - rabbitmq_url
     depends_on:
       postgres:
         condition: service_healthy
@@ -72,16 +123,22 @@ services:
     restart: always
     networks:
       - vortexflow-network
+    security_opt:
+      - no-new-privileges:true
 
   vortexflow-worker:
-    image: ghcr.io/tu-organizacion/vortexflow-worker:latest
+    image: ghcr.io/tu-organizacion/vortexflow-worker:1.0.0
+    pull_policy: if_not_present
     container_name: vortexflow-worker-prod
     environment:
-      - DATABASE_URL=postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB}
-      - REDIS_URL=redis://:${REDIS_PASSWORD}@redis:6379/0
-      - RABBITMQ_URL=amqp://${RABBITMQ_USER}:${RABBITMQ_PASSWORD}@rabbitmq:5672//
-      - DOTNET_INGEST_URL=http://vortexflow-api:8080/api/trends/ingest
-      - API_KEY_INTERNAL=${API_KEY_INTERNAL}
+      REDIS_URL_FILE: /run/secrets/redis_url
+      RABBITMQ_URL_FILE: /run/secrets/rabbitmq_url
+      DOTNET_INGEST_URL: "http://vortexflow-api:8080/api/trends/ingest"
+      API_KEY_INTERNAL_FILE: /run/secrets/api_key_internal
+    secrets:
+      - redis_url
+      - rabbitmq_url
+      - api_key_internal
     depends_on:
       postgres:
         condition: service_healthy
@@ -92,17 +149,45 @@ services:
     restart: always
     networks:
       - vortexflow-network
+    security_opt:
+      - no-new-privileges:true
 
   vortexflow-frontend:
-    image: ghcr.io/tu-organizacion/vortexflow-frontend:latest
+    image: ghcr.io/tu-organizacion/vortexflow-frontend:1.0.0
+    pull_policy: if_not_present
     container_name: vortexflow-frontend-prod
+    # Only the frontend is reachable from outside the docker network.
+    # In a real deployment, an ingress controller or reverse proxy
+    # terminates TLS on port 443 and proxies to this container.
     ports:
-      - "80:80"
+      - "127.0.0.1:8080:80"
     depends_on:
       - vortexflow-api
     restart: always
     networks:
       - vortexflow-network
+    security_opt:
+      - no-new-privileges:true
+
+secrets:
+  postgres_db:
+    file: /etc/vortexflow/secrets/postgres_db
+  postgres_user:
+    file: /etc/vortexflow/secrets/postgres_user
+  postgres_password:
+    file: /etc/vortexflow/secrets/postgres_password
+  redis_password:
+    file: /etc/vortexflow/secrets/redis_password
+  redis_url:
+    file: /etc/vortexflow/secrets/redis_url
+  rabbitmq_user:
+    file: /etc/vortexflow/secrets/rabbitmq_user
+  rabbitmq_password:
+    file: /etc/vortexflow/secrets/rabbitmq_password
+  rabbitmq_url:
+    file: /etc/vortexflow/secrets/rabbitmq_url
+  api_key_internal:
+    file: /etc/vortexflow/secrets/api_key_internal
 
 volumes:
   pgdata-prod:
@@ -112,3 +197,4 @@ volumes:
 networks:
   vortexflow-network:
     driver: bridge
+    internal: false

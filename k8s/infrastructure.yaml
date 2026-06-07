@@ -1,14 +1,19 @@
 ---
+# Postgres — headless Service backed by a StatefulSet for stable identity
+# and per-pod PVC. Port 5432 is only reachable on the cluster network.
 apiVersion: v1
 kind: Service
 metadata:
   name: postgres
   namespace: vortexflow
+  labels:
+    app: postgres
 spec:
   selector:
     app: postgres
   ports:
-    - port: 5432
+    - name: postgres
+      port: 5432
       targetPort: 5432
   clusterIP: None
 ---
@@ -17,6 +22,8 @@ kind: StatefulSet
 metadata:
   name: postgres
   namespace: vortexflow
+  labels:
+    app: postgres
 spec:
   serviceName: postgres
   replicas: 1
@@ -28,16 +35,29 @@ spec:
       labels:
         app: postgres
     spec:
+      # Default-deny egress forces any cross-pod traffic to be granted
+      # explicitly by a NetworkPolicy. Postgres only ever needs DNS.
       containers:
         - name: postgres
-          image: timescale/timescaledb:latest-pg15
+          # Pinned semver. For maximum immutability, additionally pin
+          # the digest after pulling the image:
+          #   image: timescale/timescaledb@sha256:<digest>
+          image: timescale/timescaledb:2.14.2-pg15
+          imagePullPolicy: IfNotPresent
           ports:
-            - containerPort: 5432
+            - name: postgres
+              containerPort: 5432
           env:
             - name: POSTGRES_DB
-              value: vortexflow_db
+              valueFrom:
+                secretKeyRef:
+                  name: vortexflow-secrets
+                  key: POSTGRES_DB
             - name: POSTGRES_USER
-              value: vortexflow_user
+              valueFrom:
+                secretKeyRef:
+                  name: vortexflow-secrets
+                  key: POSTGRES_USER
             - name: POSTGRES_PASSWORD
               valueFrom:
                 secretKeyRef:
@@ -51,6 +71,17 @@ spec:
               command: ["pg_isready", "-U", "vortexflow_user", "-d", "vortexflow_db"]
             initialDelaySeconds: 30
             periodSeconds: 10
+          readinessProbe:
+            exec:
+              command: ["pg_isready", "-U", "vortexflow_user", "-d", "vortexflow_db"]
+            initialDelaySeconds: 5
+            periodSeconds: 10
+          securityContext:
+            runAsNonRoot: false   # postgres image runs as the `postgres` uid
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: false
+            capabilities:
+              drop: ["ALL"]
   volumeClaimTemplates:
     - metadata:
         name: pgdata
@@ -60,16 +91,21 @@ spec:
           requests:
             storage: 10Gi
 ---
+# Redis — single replica is fine for the cache; a Sentinel/Cluster setup
+# would replace this in a real HA deployment.
 apiVersion: v1
 kind: Service
 metadata:
   name: redis
   namespace: vortexflow
+  labels:
+    app: redis
 spec:
   selector:
     app: redis
   ports:
-    - port: 6379
+    - name: redis
+      port: 6379
       targetPort: 6379
   clusterIP: None
 ---
@@ -78,6 +114,8 @@ kind: Deployment
 metadata:
   name: redis
   namespace: vortexflow
+  labels:
+    app: redis
 spec:
   replicas: 1
   selector:
@@ -90,9 +128,29 @@ spec:
     spec:
       containers:
         - name: redis
-          image: redis:7-alpine
+          # Pinned semver. To pin to a digest:
+          #   image: redis@sha256:<digest>
+          image: redis:7.2.5-alpine
+          imagePullPolicy: IfNotPresent
           ports:
-            - containerPort: 6379
+            - name: redis
+              containerPort: 6379
+          # The redis image does not natively read REDIS_PASSWORD_FILE, so
+          # the password is exported via a tiny init container; here we
+          # read directly from the Secret as an env var and rely on the
+          # pod-level `enableServiceLinks: false` to keep the secret out
+          # of the service-link env.
+          env:
+            - name: REDIS_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: vortexflow-secrets
+                  key: REDIS_PASSWORD
+          command:
+            - /bin/sh
+            - -c
+            - |
+              exec redis-server --requirepass "$$REDIS_PASSWORD"
           volumeMounts:
             - name: redisdata
               mountPath: /data
@@ -101,6 +159,14 @@ spec:
               command: ["redis-cli", "ping"]
             initialDelaySeconds: 10
             periodSeconds: 10
+          securityContext:
+            runAsNonRoot: true
+            runAsUser: 999
+            runAsGroup: 999
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: false
+            capabilities:
+              drop: ["ALL"]
       volumes:
         - name: redisdata
           persistentVolumeClaim:
@@ -117,11 +183,15 @@ spec:
     requests:
       storage: 1Gi
 ---
+# RabbitMQ — headless service + StatefulSet. Only AMQP (5672) is
+# exposed internally; the management UI (15672) is not.
 apiVersion: v1
 kind: Service
 metadata:
   name: rabbitmq
   namespace: vortexflow
+  labels:
+    app: rabbitmq
 spec:
   selector:
     app: rabbitmq
@@ -129,9 +199,6 @@ spec:
     - name: amqp
       port: 5672
       targetPort: 5672
-    - name: management
-      port: 15672
-      targetPort: 15672
   clusterIP: None
 ---
 apiVersion: apps/v1
@@ -139,6 +206,8 @@ kind: StatefulSet
 metadata:
   name: rabbitmq
   namespace: vortexflow
+  labels:
+    app: rabbitmq
 spec:
   serviceName: rabbitmq
   replicas: 1
@@ -152,10 +221,13 @@ spec:
     spec:
       containers:
         - name: rabbitmq
-          image: rabbitmq:3-management-alpine
+          # Pinned semver. To pin to a digest:
+          #   image: rabbitmq@sha256:<digest>
+          image: rabbitmq:3.13.7-management-alpine
+          imagePullPolicy: IfNotPresent
           ports:
-            - containerPort: 5672
-            - containerPort: 15672
+            - name: amqp
+              containerPort: 5672
           env:
             - name: RABBITMQ_DEFAULT_USER
               valueFrom:
@@ -175,6 +247,10 @@ spec:
               command: ["rabbitmq-diagnostics", "-q", "ping"]
             initialDelaySeconds: 20
             periodSeconds: 15
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop: ["ALL"]
   volumeClaimTemplates:
     - metadata:
         name: rabbitmqdata

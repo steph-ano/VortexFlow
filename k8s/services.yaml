@@ -1,4 +1,9 @@
 ---
+# All application deployments pin to immutable semver tags. For maximum
+# hardening, additionally pin to a sha256 digest after pulling the image:
+#   image: ghcr.io/stu-organizacion/vortexflow-api@sha256:<digest>
+# and set imagePullPolicy: IfNotPresent (the default for pinned tags).
+---
 apiVersion: v1
 kind: Service
 metadata:
@@ -44,12 +49,17 @@ spec:
         prometheus.io/path: "/metrics"
         prometheus.io/port: "8080"
     spec:
+      enableServiceLinks: false
+      automountServiceAccountToken: false
       containers:
         - name: api
-          image: ghcr.io/tu-organizacion/vortexflow-api:latest
-          imagePullPolicy: Always
+          # Pinned semver. To pin to a digest:
+          #   image: ghcr.io/tu-organizacion/vortexflow-api@sha256:<digest>
+          image: ghcr.io/tu-organizacion/vortexflow-api:1.0.0
+          imagePullPolicy: IfNotPresent
           ports:
-            - containerPort: 8080
+            - name: http
+              containerPort: 8080
           envFrom:
             - configMapRef:
                 name: vortexflow-api-config
@@ -58,13 +68,13 @@ spec:
           livenessProbe:
             httpGet:
               path: /health
-              port: 8080
+              port: http
             initialDelaySeconds: 10
             periodSeconds: 15
           readinessProbe:
             httpGet:
               path: /health
-              port: 8080
+              port: http
             initialDelaySeconds: 5
             periodSeconds: 10
           resources:
@@ -74,6 +84,14 @@ spec:
             limits:
               cpu: 500m
               memory: 512Mi
+          securityContext:
+            runAsNonRoot: true
+            runAsUser: 1000
+            runAsGroup: 1000
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities:
+              drop: ["ALL"]
 ---
 apiVersion: v1
 kind: Service
@@ -115,12 +133,17 @@ spec:
         prometheus.io/path: "/metrics"
         prometheus.io/port: "8000"
     spec:
+      enableServiceLinks: false
+      automountServiceAccountToken: false
       containers:
         - name: worker
-          image: ghcr.io/tu-organizacion/vortexflow-worker:latest
-          imagePullPolicy: Always
+          # Pinned semver. To pin to a digest:
+          #   image: ghcr.io/tu-organizacion/vortexflow-worker@sha256:<digest>
+          image: ghcr.io/tu-organizacion/vortexflow-worker:1.0.0
+          imagePullPolicy: IfNotPresent
           ports:
-            - containerPort: 8000
+            - name: http
+              containerPort: 8000
           envFrom:
             - configMapRef:
                 name: vortexflow-worker-config
@@ -129,13 +152,13 @@ spec:
           livenessProbe:
             httpGet:
               path: /health
-              port: 8000
+              port: http
             initialDelaySeconds: 15
             periodSeconds: 20
           readinessProbe:
             httpGet:
               path: /health
-              port: 8000
+              port: http
             initialDelaySeconds: 10
             periodSeconds: 15
           resources:
@@ -145,6 +168,14 @@ spec:
             limits:
               cpu: 500m
               memory: 512Mi
+          securityContext:
+            runAsNonRoot: true
+            runAsUser: 1000
+            runAsGroup: 1000
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities:
+              drop: ["ALL"]
 ---
 apiVersion: v1
 kind: Service
@@ -179,12 +210,17 @@ spec:
       labels:
         app: vortexflow-frontend
     spec:
+      enableServiceLinks: false
+      automountServiceAccountToken: false
       containers:
         - name: frontend
-          image: ghcr.io/tu-organizacion/vortexflow-frontend:latest
-          imagePullPolicy: Always
+          # Pinned semver. To pin to a digest:
+          #   image: ghcr.io/tu-organizacion/vortexflow-frontend@sha256:<digest>
+          image: ghcr.io/tu-organizacion/vortexflow-frontend:1.0.0
+          imagePullPolicy: IfNotPresent
           ports:
-            - containerPort: 80
+            - name: http
+              containerPort: 80
           envFrom:
             - configMapRef:
                 name: vortexflow-frontend-config
@@ -195,3 +231,11 @@ spec:
             limits:
               cpu: 250m
               memory: 128Mi
+          securityContext:
+            runAsNonRoot: true
+            runAsUser: 101
+            runAsGroup: 101
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities:
+              drop: ["ALL"]

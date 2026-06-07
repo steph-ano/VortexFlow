@@ -1,0 +1,349 @@
+---
+# ---------------------------------------------------------------------------
+# VortexFlow - NetworkPolicies
+#
+# Default-deny posture for the `vortexflow` namespace. Every pod in the
+# namespace has all ingress and egress traffic blocked unless an explicit
+# policy below grants it. The policies that follow permit ONLY the
+# connections the application actually needs:
+#
+#   1.  All pods  -> kube-dns (UDP/TCP 53) for service discovery
+#   2.  ingress-nginx -> frontend (port 80)
+#   3.  ingress-nginx -> api (port 8080)
+#   4.  frontend -> api (port 8080)
+#   5.  api      -> postgres (port 5432)
+#   6.  api      -> redis    (port 6379)
+#   7.  api      -> rabbitmq (port 5672)
+#   8.  worker   -> postgres (port 5432)
+#   9.  worker   -> redis    (port 6379)
+#  10.  worker   -> rabbitmq (port 5672)
+#  11.  worker   -> api      (port 8080) for the HTTP ingest fallback
+#  12.  prometheus -> api/worker/frontend (metrics endpoints)
+#
+# Notes:
+#  * Pod-to-pod traffic between api/worker/frontend is otherwise blocked.
+#  * Postgres/Redis/RabbitMQ pods have NO ingress rules beyond their own
+#    policies, so the only way traffic reaches them is via the explicit
+#    egress policies on api/worker.
+#  * Kubelet -> pod traffic for liveness/readiness probes is unaffected
+#    by NetworkPolicy (the kubelet bypasses the CNI policy layer).
+# ---------------------------------------------------------------------------
+
+# 1. Default-deny baseline.
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: default-deny-all
+  namespace: vortexflow
+spec:
+  # Selecting every pod in the namespace.
+  podSelector: {}
+  policyTypes:
+    - Ingress
+    - Egress
+  # No ingress or egress rules -> all traffic denied.
+
+---
+# 2. Allow DNS resolution to kube-dns. Without this, no pod can resolve
+#    service names and nothing works.
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-dns-egress
+  namespace: vortexflow
+spec:
+  podSelector: {}
+  policyTypes:
+    - Egress
+  egress:
+    - to:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: kube-system
+          podSelector:
+            matchLabels:
+              k8s-app: kube-dns
+      ports:
+        - protocol: UDP
+          port: 53
+        - protocol: TCP
+          port: 53
+
+---
+# 3. Frontend may reach the API. Browsers connect through the ingress,
+#    but the dev/test environment (and any in-cluster sidecar) may
+#    call the API directly.
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-frontend-to-api
+  namespace: vortexflow
+spec:
+  podSelector:
+    matchLabels:
+      app: vortexflow-frontend
+  policyTypes:
+    - Egress
+  egress:
+    - to:
+        - podSelector:
+            matchLabels:
+              app: vortexflow-api
+      ports:
+        - protocol: TCP
+          port: 8080
+
+---
+# 4. Ingress-nginx (running in the ingress-nginx namespace) may reach
+#    the frontend on port 80.
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-ingress-to-frontend
+  namespace: vortexflow
+spec:
+  podSelector:
+    matchLabels:
+      app: vortexflow-frontend
+  policyTypes:
+    - Ingress
+  ingress:
+    - from:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: ingress-nginx
+          podSelector:
+            matchLabels:
+              app.kubernetes.io/name: ingress-nginx
+      ports:
+        - protocol: TCP
+          port: 80
+
+---
+# 5. Ingress-nginx may reach the API on port 8080 (handles /api/*).
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-ingress-to-api
+  namespace: vortexflow
+spec:
+  podSelector:
+    matchLabels:
+      app: vortexflow-api
+  policyTypes:
+    - Ingress
+  ingress:
+    - from:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: ingress-nginx
+          podSelector:
+            matchLabels:
+              app.kubernetes.io/name: ingress-nginx
+      ports:
+        - protocol: TCP
+          port: 8080
+    # The frontend may also call the API directly (e.g. when the
+    # ingress is bypassed in dev/test).
+    - from:
+        - podSelector:
+            matchLabels:
+              app: vortexflow-frontend
+      ports:
+        - protocol: TCP
+          port: 8080
+    # The worker calls the API for the HTTP ingest fallback.
+    - from:
+        - podSelector:
+            matchLabels:
+              app: vortexflow-worker
+      ports:
+        - protocol: TCP
+          port: 8080
+
+---
+# 6. API may reach the database tier.
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-api-to-databases
+  namespace: vortexflow
+spec:
+  podSelector:
+    matchLabels:
+      app: vortexflow-api
+  policyTypes:
+    - Egress
+  egress:
+    - to:
+        - podSelector:
+            matchLabels:
+              app: postgres
+      ports:
+        - protocol: TCP
+          port: 5432
+    - to:
+        - podSelector:
+            matchLabels:
+              app: redis
+      ports:
+        - protocol: TCP
+          port: 6379
+    - to:
+        - podSelector:
+            matchLabels:
+              app: rabbitmq
+      ports:
+        - protocol: TCP
+          port: 5672
+
+---
+# 7. Worker may reach the database tier AND the API for the HTTP
+#    ingest fallback. Worker never receives inbound traffic.
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-worker-to-databases-and-api
+  namespace: vortexflow
+spec:
+  podSelector:
+    matchLabels:
+      app: vortexflow-worker
+  policyTypes:
+    - Egress
+  egress:
+    - to:
+        - podSelector:
+            matchLabels:
+              app: postgres
+      ports:
+        - protocol: TCP
+          port: 5432
+    - to:
+        - podSelector:
+            matchLabels:
+              app: redis
+      ports:
+        - protocol: TCP
+          port: 6379
+    - to:
+        - podSelector:
+            matchLabels:
+              app: rabbitmq
+      ports:
+        - protocol: TCP
+          port: 5672
+    - to:
+        - podSelector:
+            matchLabels:
+              app: vortexflow-api
+      ports:
+        - protocol: TCP
+          port: 8080
+
+---
+# 8. Postgres accepts connections ONLY from the api and the worker.
+#    The admin tool / debug port (5432) is not exposed elsewhere.
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-postgres-ingress
+  namespace: vortexflow
+spec:
+  podSelector:
+    matchLabels:
+      app: postgres
+  policyTypes:
+    - Ingress
+  ingress:
+    - from:
+        - podSelector:
+            matchLabels:
+              app: vortexflow-api
+        - podSelector:
+            matchLabels:
+              app: vortexflow-worker
+      ports:
+        - protocol: TCP
+          port: 5432
+
+---
+# 9. Redis accepts connections ONLY from the api and the worker.
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-redis-ingress
+  namespace: vortexflow
+spec:
+  podSelector:
+    matchLabels:
+      app: redis
+  policyTypes:
+    - Ingress
+  ingress:
+    - from:
+        - podSelector:
+            matchLabels:
+              app: vortexflow-api
+        - podSelector:
+            matchLabels:
+              app: vortexflow-worker
+      ports:
+        - protocol: TCP
+          port: 6379
+
+---
+# 10. RabbitMQ accepts AMQP connections ONLY from the api and the
+#     worker. The management UI port (15672) is intentionally not
+#     opened; operators use `kubectl exec` for ad-hoc inspection.
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-rabbitmq-ingress
+  namespace: vortexflow
+spec:
+  podSelector:
+    matchLabels:
+      app: rabbitmq
+  policyTypes:
+    - Ingress
+  ingress:
+    - from:
+        - podSelector:
+            matchLabels:
+              app: vortexflow-api
+        - podSelector:
+            matchLabels:
+              app: vortexflow-worker
+      ports:
+        - protocol: TCP
+          port: 5672
+
+---
+# 11. Prometheus (running in the observability namespace) is allowed
+#     to scrape metrics endpoints on api, worker, and frontend.
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-prometheus-scrape
+  namespace: vortexflow
+spec:
+  podSelector: {}
+  policyTypes:
+    - Ingress
+  ingress:
+    - from:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: observability
+          podSelector:
+            matchLabels:
+              app.kubernetes.io/name: prometheus
+      ports:
+        - protocol: TCP
+          port: 8080
+        - protocol: TCP
+          port: 8000
+        - protocol: TCP
+          port: 9090
