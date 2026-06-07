@@ -280,7 +280,14 @@ jobs:
           set -euo pipefail
           for f in k8s/*.yaml; do
             echo "::group::kubectl --dry-run=client $f"
-            kubectl apply --dry-run=client -f "$f"
+            # --validate=false is required in CI because kubectl otherwise
+            # tries to download the OpenAPI schema from the apiserver
+            # pointed to by the kubeconfig (default: localhost:8080),
+            # which fails with "connection refused" when no cluster is
+            # available. We only need a structural / parse check here;
+            # schema-level validation against the upstream K8s JSON
+            # schemas is performed by kubeconform immediately after.
+            kubectl apply --dry-run=client --validate=false -f "$f"
             echo "::endgroup::"
           done
 
