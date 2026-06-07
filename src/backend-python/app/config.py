@@ -7,8 +7,6 @@ established; do not reintroduce development placeholders.
 """
 from __future__ import annotations
 
-from typing import Optional
-
 from pydantic import Field, field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
@@ -24,7 +22,11 @@ class Settings(BaseSettings):
     RABBITMQ_URL: str = Field(..., description="AMQP connection string for the broker.")
     REDIS_URL: str = Field(..., description="Redis connection string used for cache and Celery results.")
     DOTNET_INGEST_URL: str = Field(..., description="HTTP fallback URL for the .NET ingest endpoint.")
-    API_KEY_INTERNAL: str = Field(..., min_length=16, description="Static API key expected by the .NET ingest endpoint.")
+    API_KEY_INTERNAL: str = Field(
+        ...,
+        min_length=16,
+        description="Static API key expected by the .NET ingest endpoint.",
+    )
     SCRAPING_INTERVAL_MINUTES: int = Field(5, ge=1, le=1440)
     OTLP_ENDPOINT: str = Field("http://localhost:4317")
     HOSTNAME: str = Field("unknown")

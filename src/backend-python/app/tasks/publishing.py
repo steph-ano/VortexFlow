@@ -7,7 +7,6 @@ mode without contract drift.
 from __future__ import annotations
 
 import uuid
-from typing import Any
 
 import httpx
 import structlog

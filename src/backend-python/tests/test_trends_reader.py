@@ -7,8 +7,6 @@ from __future__ import annotations
 
 from unittest.mock import MagicMock
 
-import pytest
-
 from app.main import get_current_trends
 
 
@@ -28,7 +26,11 @@ def test_get_current_trends_caps_at_limit(monkeypatch):
     fake_redis = MagicMock()
     # Yield 100 keys; limit=10 must short-circuit.
     fake_redis.scan_iter.return_value = (f"trend:current:twitter:#t{i}" for i in range(100))
-    fake_redis.get.return_value = b'{"eventId":"e","platform":"twitter","hashtags":["#t0"],"source":"s","timestamp":"2026-01-01T00:00:00","metrics":{"volume":1,"sentiment":0.0,"engagement":0.0}}'
+    fake_redis.get.return_value = (
+        b'{"eventId":"e","platform":"twitter","hashtags":["#t0"],'
+        b'"source":"s","timestamp":"2026-01-01T00:00:00",'
+        b'"metrics":{"volume":1,"sentiment":0.0,"engagement":0.0}}'
+    )
     monkeypatch.setattr("app.main.redis_client", fake_redis)
 
     result = get_current_trends(limit=10)

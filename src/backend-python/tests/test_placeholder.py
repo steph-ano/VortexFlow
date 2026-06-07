@@ -1,5 +1,4 @@
 """Smoke test kept for backwards compatibility with the original test runner."""
-import pytest
 
 
 def test_placeholder():

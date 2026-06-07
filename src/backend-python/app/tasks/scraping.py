@@ -4,7 +4,6 @@ two workers don't double-scrape the same source.
 from __future__ import annotations
 
 import asyncio
-import logging
 
 import structlog
 from redis import Redis

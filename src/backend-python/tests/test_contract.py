@@ -14,17 +14,13 @@ service is even deployed.
 from __future__ import annotations
 
 import json
-from unittest.mock import MagicMock, patch
+from unittest.mock import patch
 
 import httpx
 import pytest
 
 from app.models.trend import TrendMetrics, TrendsProcessedEvent
-from app.tasks.publishing import (
-    HTTP_FALLBACK_HEADER,
-    _build_event,
-    _publish_to_http_fallback,
-)
+from app.tasks.publishing import _build_event, _publish_to_http_fallback
 
 
 @pytest.fixture
